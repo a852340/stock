@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-dark text-text font-sans antialiased;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  
+  #root {
+    @apply h-screen w-screen;
+  }
+}
+
+@layer components {
+  .stock-sidebar {
+    @apply bg-dark-primary border-r border-dark-border flex flex-col;
+  }
+  
+  .stock-main {
+    @apply bg-dark flex-1 flex flex-col;
+  }
+  
+  .stock-item {
+    @apply px-4 py-3 hover:bg-dark-secondary cursor-pointer border-b border-dark-border transition-colors duration-150;
+  }
+  
+  .stock-item.active {
+    @apply bg-dark-secondary border-l-4 border-blue-500;
+  }
+  
+  .stock-code {
+    @apply font-mono text-sm font-semibold text-text;
+  }
+  
+  .stock-name {
+    @apply text-xs text-textSecondary mt-1;
+  }
+}
