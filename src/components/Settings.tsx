@@ -13,9 +13,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newInterval = localInterval * 1000
-    setPollInterval(newInterval)
+    await setPollInterval(newInterval)
     dataFetcher.updateStockPollingInterval(newInterval)
     dataFetcher.clearStockCache()
     onClose()

@@ -30,7 +30,7 @@ export const AddSymbolDialog: React.FC<AddSymbolDialogProps> = ({ isOpen, onClos
 
   if (!isOpen) return null
 
-  const handleAddSymbol = (symbol: string) => {
+  const handleAddSymbol = async (symbol: string) => {
     const config = SUPPORTED_SYMBOLS.find(s => s.symbol === symbol)
     if (config) {
       const newStock: Stock = {
@@ -38,7 +38,7 @@ export const AddSymbolDialog: React.FC<AddSymbolDialogProps> = ({ isOpen, onClos
         name: config.name,
         type: config.type
       }
-      addStock(newStock)
+      await addStock(newStock)
     }
   }
 

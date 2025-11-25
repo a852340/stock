@@ -10,9 +10,9 @@ export const StockList: React.FC = () => {
     setSelectedStock(stock)
   }
 
-  const handleRemoveStock = (code: string, e: React.MouseEvent) => {
+  const handleRemoveStock = async (code: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    removeStock(code)
+    await removeStock(code)
   }
 
   const formatPrice = (price?: number) => {
