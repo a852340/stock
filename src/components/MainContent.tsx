@@ -3,6 +3,47 @@ import { useStockStore } from '../store/stockStore'
 export const MainContent: React.FC = () => {
   const { selectedStock } = useStockStore()
 
+  const formatPrice = (price?: number) => {
+    if (price === undefined) return '--'
+    return price.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: price < 1 ? 6 : 2
+    })
+  }
+
+  const formatPercent = (percent?: number) => {
+    if (percent === undefined) return '--'
+    const sign = percent >= 0 ? '+' : ''
+    return `${sign}${percent.toFixed(2)}%`
+  }
+
+  const formatVolume = (volume?: number) => {
+    if (volume === undefined) return '--'
+    if (volume >= 1e9) return `${(volume / 1e9).toFixed(2)}B`
+    if (volume >= 1e6) return `${(volume / 1e6).toFixed(2)}M`
+    if (volume >= 1e3) return `${(volume / 1e3).toFixed(2)}K`
+    return volume.toFixed(2)
+  }
+
+  const formatMarketCap = (marketCap?: number) => {
+    if (marketCap === undefined) return '--'
+    if (marketCap >= 1e12) return `${(marketCap / 1e12).toFixed(2)}T`
+    if (marketCap >= 1e9) return `${(marketCap / 1e9).toFixed(2)}B`
+    if (marketCap >= 1e6) return `${(marketCap / 1e6).toFixed(2)}M`
+    return marketCap.toFixed(2)
+  }
+
+  const getChangeColor = (percent?: number) => {
+    if (percent === undefined) return 'text-dark-text'
+    return percent >= 0 ? 'text-green-500' : 'text-red-500'
+  }
+
+  const formatTime = (timestamp?: number) => {
+    if (!timestamp) return '--'
+    const date = new Date(timestamp)
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+
   return (
     <div className="stock-main">
       <div className="border-b border-dark-border p-6">
@@ -10,9 +51,21 @@ export const MainContent: React.FC = () => {
           {selectedStock ? selectedStock.name : '股票行情应用'}
         </h1>
         {selectedStock && (
-          <p className="text-dark-textSecondary mt-2">
-            {selectedStock.code} - 实时行情数据
-          </p>
+          <div className="flex items-center gap-4 mt-2">
+            <p className="text-dark-textSecondary">
+              {selectedStock.code} - {selectedStock.isRealtime ? '实时数据' : '轮询数据'}
+            </p>
+            {selectedStock.dataSource && (
+              <span className="text-xs px-2 py-1 rounded bg-dark-bgLight text-dark-textSecondary">
+                数据源: {selectedStock.dataSource}
+              </span>
+            )}
+            {selectedStock.lastUpdate && (
+              <span className="text-xs text-dark-textSecondary">
+                更新时间: {formatTime(selectedStock.lastUpdate)}
+              </span>
+            )}
+          </div>
         )}
       </div>
       
@@ -20,17 +73,24 @@ export const MainContent: React.FC = () => {
         {selectedStock ? (
           <div className="space-y-6">
             <div className="bg-dark-primary rounded-lg p-6 border border-dark-border">
-              <h3 className="text-lg font-semibold text-dark-text mb-4">
+              <h3 className="text-lg font-semibold text-dark-text mb-4 flex items-center gap-2">
                 {selectedStock.code} - {selectedStock.name}
+                {selectedStock.isRealtime && (
+                  <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" title="实时数据"></span>
+                )}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <div className="text-sm text-dark-textSecondary">当前价格</div>
-                  <div className="text-2xl font-bold text-dark-text">--</div>
+                  <div className="text-3xl font-bold text-dark-text">
+                    {formatPrice(selectedStock.price)}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-dark-textSecondary">涨跌幅</div>
-                  <div className="text-2xl font-bold text-dark-text">--</div>
+                  <div className={`text-3xl font-bold ${getChangeColor(selectedStock.changePercent)}`}>
+                    {formatPercent(selectedStock.changePercent)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -46,28 +106,38 @@ export const MainContent: React.FC = () => {
               <h3 className="text-lg font-semibold text-dark-text mb-4">详细数据</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <div className="text-sm text-dark-textSecondary">开盘价</div>
-                  <div className="font-mono text-dark-text">--</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-dark-textSecondary">最高价</div>
-                  <div className="font-mono text-dark-text">--</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-dark-textSecondary">最低价</div>
-                  <div className="font-mono text-dark-text">--</div>
+                  <div className="text-sm text-dark-textSecondary">涨跌额</div>
+                  <div className={`font-mono ${getChangeColor(selectedStock.changePercent)}`}>
+                    {selectedStock.change !== undefined ? formatPrice(selectedStock.change) : '--'}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-dark-textSecondary">成交量</div>
-                  <div className="font-mono text-dark-text">--</div>
+                  <div className="font-mono text-dark-text">{formatVolume(selectedStock.volume)}</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-dark-textSecondary">市值</div>
-                  <div className="font-mono text-dark-text">--</div>
+                  <div className="text-sm text-dark-textSecondary">
+                    {selectedStock.type === 'crypto' ? '成交额' : '市值'}
+                  </div>
+                  <div className="font-mono text-dark-text">{formatMarketCap(selectedStock.marketCap)}</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-dark-textSecondary">市盈率</div>
-                  <div className="font-mono text-dark-text">--</div>
+                  <div className="text-sm text-dark-textSecondary">标的类型</div>
+                  <div className="font-mono text-dark-text">
+                    {selectedStock.type === 'crypto' ? '加密货币' : 'A股'}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-dark-textSecondary">数据模式</div>
+                  <div className="font-mono text-dark-text">
+                    {selectedStock.isRealtime ? 'WebSocket 实时' : 'HTTP 轮询'}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-dark-textSecondary">数据源</div>
+                  <div className="font-mono text-dark-text uppercase">
+                    {selectedStock.dataSource || '--'}
+                  </div>
                 </div>
               </div>
             </div>
