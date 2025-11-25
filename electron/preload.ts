@@ -18,7 +18,11 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
+})
 
-  // You can expose other APTs you need here.
-  // ...
+contextBridge.exposeInMainWorld('electronStore', {
+  get: (key: string) => ipcRenderer.invoke('electron-store-get', key),
+  set: (key: string, value: unknown) => ipcRenderer.invoke('electron-store-set', key, value),
+  getAll: () => ipcRenderer.invoke('electron-store-get-all'),
+  reset: () => ipcRenderer.invoke('electron-store-reset'),
 })

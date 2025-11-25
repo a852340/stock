@@ -1,6 +1,7 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import Store from 'electron-store'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -23,6 +24,47 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+
+interface StorageData {
+  stocks: unknown[]
+  pollInterval: number
+}
+
+const schema = {
+  stocks: {
+    type: 'array',
+    default: []
+  },
+  pollInterval: {
+    type: 'number',
+    default: 5000
+  }
+}
+
+const store = new Store<StorageData>({
+  schema: schema as Store.Schema<StorageData>,
+  name: 'app-store'
+})
+
+function setupIpcHandlers() {
+  ipcMain.handle('electron-store-get', (_event, key: string) => {
+    return store.get(key)
+  })
+
+  ipcMain.handle('electron-store-set', (_event, key: string, value: unknown) => {
+    store.set(key, value)
+    return true
+  })
+
+  ipcMain.handle('electron-store-get-all', () => {
+    return store.store
+  })
+
+  ipcMain.handle('electron-store-reset', () => {
+    store.reset()
+    return true
+  })
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -66,4 +108,7 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  setupIpcHandlers()
+  createWindow()
+})

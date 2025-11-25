@@ -1,4 +1,3 @@
-import Store from 'electron-store'
 import { Stock } from '../store/stockStore'
 
 interface StorageData {
@@ -6,70 +5,102 @@ interface StorageData {
   pollInterval: number
 }
 
-const schema = {
-  stocks: {
-    type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        code: { type: 'string' },
-        name: { type: 'string' },
-        type: { type: 'string', enum: ['crypto', 'stock'] }
-      },
-      required: ['code', 'name', 'type']
-    },
-    default: []
-  },
-  pollInterval: {
-    type: 'number',
-    default: 5000
+declare global {
+  interface Window {
+    electronStore?: {
+      get: (key: string) => Promise<unknown>
+      set: (key: string, value: unknown) => Promise<boolean>
+      getAll: () => Promise<StorageData>
+      reset: () => Promise<boolean>
+    }
   }
 }
 
 class StorageService {
-  private store: Store<StorageData>
-
-  constructor() {
-    this.store = new Store({
-      schema: schema as Store.Schema<StorageData>,
-      name: 'app-store'
-    })
-  }
-
-  getSavedStocks(): Stock[] {
-    const stocks = this.store.get('stocks', [])
-    return stocks as Stock[]
-  }
-
-  saveStocks(stocks: Stock[]): void {
-    this.store.set('stocks', stocks)
-  }
-
-  getPollInterval(): number {
-    return this.store.get('pollInterval', 5000)
-  }
-
-  setPollInterval(interval: number): void {
-    this.store.set('pollInterval', interval)
-  }
-
-  addStock(stock: Stock): void {
-    const stocks = this.getSavedStocks()
-    const exists = stocks.some(s => s.code === stock.code)
-    if (!exists) {
-      stocks.push(stock)
-      this.saveStocks(stocks)
+  async getSavedStocks(): Promise<Stock[]> {
+    try {
+      if (!window.electronStore) {
+        console.warn('electron-store not available')
+        return []
+      }
+      const stocks = await window.electronStore.get('stocks')
+      return stocks ? (stocks as Stock[]) : []
+    } catch (e) {
+      console.warn('Failed to get saved stocks', e)
+      return []
     }
   }
 
-  removeStock(code: string): void {
-    const stocks = this.getSavedStocks()
-    const filtered = stocks.filter(s => s.code !== code)
-    this.saveStocks(filtered)
+  async saveStocks(stocks: Stock[]): Promise<void> {
+    try {
+      if (!window.electronStore) {
+        console.warn('electron-store not available')
+        return
+      }
+      await window.electronStore.set('stocks', stocks)
+    } catch (e) {
+      console.warn('Failed to save stocks', e)
+    }
   }
 
-  clear(): void {
-    this.store.reset()
+  async getPollInterval(): Promise<number> {
+    try {
+      if (!window.electronStore) {
+        return 5000
+      }
+      const interval = await window.electronStore.get('pollInterval')
+      return interval ? (interval as number) : 5000
+    } catch (e) {
+      console.warn('Failed to get poll interval', e)
+      return 5000
+    }
+  }
+
+  async setPollInterval(interval: number): Promise<void> {
+    try {
+      if (!window.electronStore) {
+        console.warn('electron-store not available')
+        return
+      }
+      await window.electronStore.set('pollInterval', interval)
+    } catch (e) {
+      console.warn('Failed to set poll interval', e)
+    }
+  }
+
+  async addStock(stock: Stock): Promise<void> {
+    try {
+      const stocks = await this.getSavedStocks()
+      const exists = stocks.some(s => s.code === stock.code)
+      if (!exists) {
+        stocks.push(stock)
+        await this.saveStocks(stocks)
+      }
+    } catch (e) {
+      console.warn('Failed to add stock', e)
+    }
+  }
+
+  async removeStock(code: string): Promise<void> {
+    try {
+      const stocks = await this.getSavedStocks()
+      const filtered = stocks.filter(s => s.code !== code)
+      await this.saveStocks(filtered)
+    } catch (e) {
+      console.warn('Failed to remove stock', e)
+    }
+  }
+
+  async clear(): Promise<void> {
+    try {
+      if (!window.electronStore) {
+        console.warn('electron-store not available')
+        return
+      }
+      await window.electronStore.reset()
+    } catch (e) {
+      console.warn('Failed to reset storage', e)
+    }
   }
 }
 

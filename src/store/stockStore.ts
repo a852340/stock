@@ -23,24 +23,15 @@ interface StockStore {
   quotesData: Map<string, QuoteData>
   pollInterval: number
   setSelectedStock: (stock: Stock | null) => void
-  addStock: (stock: Stock) => void
-  removeStock: (code: string) => void
+  addStock: (stock: Stock) => Promise<void>
+  removeStock: (code: string) => Promise<void>
   updateQuoteData: (symbol: string, data: QuoteData) => void
   getQuoteData: (symbol: string) => QuoteData | undefined
-  setPollInterval: (interval: number) => void
-  loadInitialStocks: () => void
+  setPollInterval: (interval: number) => Promise<void>
+  loadInitialStocks: () => Promise<void>
 }
 
-const getInitialStocks = (): Stock[] => {
-  try {
-    const saved = storageService.getSavedStocks()
-    if (saved && saved.length > 0) {
-      return saved
-    }
-  } catch (e) {
-    console.warn('Failed to load stocks from storage', e)
-  }
-  
+const getDefaultStocks = (): Stock[] => {
   return SUPPORTED_SYMBOLS.slice(0, 15).map(config => ({
     code: config.symbol,
     name: config.name,
@@ -49,32 +40,36 @@ const getInitialStocks = (): Stock[] => {
 }
 
 export const useStockStore = create<StockStore>((set, get) => ({
-  stocks: getInitialStocks(),
+  stocks: getDefaultStocks(),
   selectedStock: null,
   quotesData: new Map(),
   pollInterval: 5000,
   
   setSelectedStock: (stock) => set({ selectedStock: stock }),
   
-  addStock: (stock) => set((state) => {
-    const newStocks = [...state.stocks, stock]
-    storageService.saveStocks(newStocks)
-    return { stocks: newStocks }
-  }),
+  addStock: async (stock) => {
+    set((state) => {
+      const newStocks = [...state.stocks, stock]
+      return { stocks: newStocks }
+    })
+    await storageService.addStock(stock)
+  },
   
-  removeStock: (code) => set((state) => {
-    const newQuotesData = new Map(state.quotesData)
-    newQuotesData.delete(code)
-    
-    const newStocks = state.stocks.filter(stock => stock.code !== code)
-    storageService.saveStocks(newStocks)
-    
-    return {
-      stocks: newStocks,
-      selectedStock: state.selectedStock?.code === code ? null : state.selectedStock,
-      quotesData: newQuotesData
-    }
-  }),
+  removeStock: async (code) => {
+    set((state) => {
+      const newQuotesData = new Map(state.quotesData)
+      newQuotesData.delete(code)
+      
+      const newStocks = state.stocks.filter(stock => stock.code !== code)
+      
+      return {
+        stocks: newStocks,
+        selectedStock: state.selectedStock?.code === code ? null : state.selectedStock,
+        quotesData: newQuotesData
+      }
+    })
+    await storageService.removeStock(code)
+  },
   
   updateQuoteData: (symbol, data) => set((state) => {
     const newQuotesData = new Map(state.quotesData)
@@ -114,19 +109,19 @@ export const useStockStore = create<StockStore>((set, get) => ({
     return get().quotesData.get(symbol)
   },
   
-  setPollInterval: (interval) => {
-    storageService.setPollInterval(interval)
+  setPollInterval: async (interval) => {
     set({ pollInterval: interval })
+    await storageService.setPollInterval(interval)
   },
   
-  loadInitialStocks: () => {
+  loadInitialStocks: async () => {
     try {
-      const saved = storageService.getSavedStocks()
+      const saved = await storageService.getSavedStocks()
       if (saved && saved.length > 0) {
         set({ stocks: saved })
       }
       
-      const savedInterval = storageService.getPollInterval()
+      const savedInterval = await storageService.getPollInterval()
       if (savedInterval) {
         set({ pollInterval: savedInterval })
       }
