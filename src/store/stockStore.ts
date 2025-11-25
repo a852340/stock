@@ -32,7 +32,7 @@ interface StockStore {
 }
 
 const getDefaultStocks = (): Stock[] => {
-  return SUPPORTED_SYMBOLS.slice(0, 15).map(config => ({
+  return SUPPORTED_SYMBOLS.map(config => ({
     code: config.symbol,
     name: config.name,
     type: config.type
