@@ -1,12 +1,22 @@
 @import "tailwindcss";
 
+@theme {
+  --color-dark: #1a1a1a;
+  --color-dark-primary: #2a2a2a;
+  --color-dark-secondary: #3a3a3a;
+  --color-dark-accent: #4a4a4a;
+  --color-dark-text: #e0e0e0;
+  --color-dark-textSecondary: #a0a0a0;
+  --color-dark-border: #404040;
+}
+
 @layer base {
   * {
-    @apply border-border;
+    box-sizing: border-box;
   }
   
   body {
-    @apply bg-dark text-text font-sans antialiased;
+    @apply bg-dark text-dark-text font-sans antialiased;
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -35,10 +45,10 @@
   }
   
   .stock-code {
-    @apply font-mono text-sm font-semibold text-text;
+    @apply font-mono text-sm font-semibold text-dark-text;
   }
   
   .stock-name {
-    @apply text-xs text-textSecondary mt-1;
+    @apply text-xs text-dark-textSecondary mt-1;
   }
 }
