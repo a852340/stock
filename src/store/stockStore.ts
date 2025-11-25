@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { QuoteData } from '../types/quote'
 import { SUPPORTED_SYMBOLS } from '../config/dataSourceConfig'
+import { storageService } from '../services/storageService'
 
 export interface Stock {
   code: string
@@ -27,32 +28,49 @@ interface StockStore {
   updateQuoteData: (symbol: string, data: QuoteData) => void
   getQuoteData: (symbol: string) => QuoteData | undefined
   setPollInterval: (interval: number) => void
+  loadInitialStocks: () => void
 }
 
-const initialStocks: Stock[] = SUPPORTED_SYMBOLS.slice(0, 15).map(config => ({
-  code: config.symbol,
-  name: config.name,
-  type: config.type
-}))
+const getInitialStocks = (): Stock[] => {
+  try {
+    const saved = storageService.getSavedStocks()
+    if (saved && saved.length > 0) {
+      return saved
+    }
+  } catch (e) {
+    console.warn('Failed to load stocks from storage', e)
+  }
+  
+  return SUPPORTED_SYMBOLS.slice(0, 15).map(config => ({
+    code: config.symbol,
+    name: config.name,
+    type: config.type
+  }))
+}
 
 export const useStockStore = create<StockStore>((set, get) => ({
-  stocks: initialStocks,
+  stocks: getInitialStocks(),
   selectedStock: null,
   quotesData: new Map(),
   pollInterval: 5000,
   
   setSelectedStock: (stock) => set({ selectedStock: stock }),
   
-  addStock: (stock) => set((state) => ({ 
-    stocks: [...state.stocks, stock] 
-  })),
+  addStock: (stock) => set((state) => {
+    const newStocks = [...state.stocks, stock]
+    storageService.saveStocks(newStocks)
+    return { stocks: newStocks }
+  }),
   
   removeStock: (code) => set((state) => {
     const newQuotesData = new Map(state.quotesData)
     newQuotesData.delete(code)
     
+    const newStocks = state.stocks.filter(stock => stock.code !== code)
+    storageService.saveStocks(newStocks)
+    
     return {
-      stocks: state.stocks.filter(stock => stock.code !== code),
+      stocks: newStocks,
       selectedStock: state.selectedStock?.code === code ? null : state.selectedStock,
       quotesData: newQuotesData
     }
@@ -96,5 +114,24 @@ export const useStockStore = create<StockStore>((set, get) => ({
     return get().quotesData.get(symbol)
   },
   
-  setPollInterval: (interval) => set({ pollInterval: interval })
+  setPollInterval: (interval) => {
+    storageService.setPollInterval(interval)
+    set({ pollInterval: interval })
+  },
+  
+  loadInitialStocks: () => {
+    try {
+      const saved = storageService.getSavedStocks()
+      if (saved && saved.length > 0) {
+        set({ stocks: saved })
+      }
+      
+      const savedInterval = storageService.getPollInterval()
+      if (savedInterval) {
+        set({ pollInterval: savedInterval })
+      }
+    } catch (e) {
+      console.warn('Failed to load initial stocks from storage', e)
+    }
+  }
 }))
