@@ -1,14 +1,21 @@
-import { useState } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useStockStore, Stock } from '../store/stockStore'
 import { AddSymbolDialog } from './AddSymbolDialog'
 
 export const StockList: React.FC = () => {
   const { stocks, selectedStock, setSelectedStock, removeStock } = useStockStore()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const selectedItemRef = useRef<HTMLDivElement>(null)
 
   const handleStockClick = (stock: Stock) => {
     setSelectedStock(stock)
   }
+
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [selectedStock])
 
   const handleRemoveStock = async (code: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -39,18 +46,19 @@ export const StockList: React.FC = () => {
       <div className="stock-sidebar w-80">
         <div className="p-4 border-b border-dark-border">
           <h2 className="text-lg font-semibold text-dark-text">标的列表</h2>
-          <p className="text-xs text-dark-textSecondary mt-1">点击选择要查看的股票</p>
+          <p className="text-xs text-dark-textSecondary mt-1">点击选择或按 ↑/↓ 快速切换</p>
         </div>
         
         <div className="flex-1 overflow-y-auto">
-          {stocks.map((stock) => (
-            <div
-              key={stock.code}
-              className={`p-3 border-b border-dark-border cursor-pointer transition-colors hover:bg-dark-bgLight group ${
-                selectedStock?.code === stock.code ? 'bg-dark-bgLight' : ''
-              }`}
-              onClick={() => handleStockClick(stock)}
-            >
+           {stocks.map((stock) => (
+             <div
+               key={stock.code}
+               ref={selectedStock?.code === stock.code ? selectedItemRef : null}
+               className={`p-3 border-b border-dark-border cursor-pointer transition-colors hover:bg-dark-bgLight group ${
+                 selectedStock?.code === stock.code ? 'bg-dark-bgLight border-l-4 border-l-blue-500' : ''
+               }`}
+               onClick={() => handleStockClick(stock)}
+             >
               <div className="flex justify-between items-start mb-1">
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-dark-text flex items-center gap-2">
