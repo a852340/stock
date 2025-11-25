@@ -54,7 +54,9 @@ class StockDataFetcher {
   }
 
   private async fetchFromTencent(symbol: string): Promise<QuoteData> {
-    const market = symbol.startsWith('6') ? 'sh' : 'sz'
+    // Shanghai Composite Index (000001) is a Shanghai market index
+    // A-shares starting with 6 are Shanghai, others are Shenzhen
+    const market = symbol === '000001' || symbol.startsWith('6') ? 'sh' : 'sz'
     const fullSymbol = `${market}${symbol}`
     
     const url = `https://qt.gtimg.cn/q=${fullSymbol}`
@@ -102,7 +104,9 @@ class StockDataFetcher {
   }
 
   private async fetchFromSina(symbol: string): Promise<QuoteData> {
-    const market = symbol.startsWith('6') ? 'sh' : 'sz'
+    // Shanghai Composite Index (000001) is a Shanghai market index
+    // A-shares starting with 6 are Shanghai, others are Shenzhen
+    const market = symbol === '000001' || symbol.startsWith('6') ? 'sh' : 'sz'
     const fullSymbol = `${market}${symbol}`
     
     const url = `https://hq.sinajs.cn/list=${fullSymbol}`

@@ -10,7 +10,7 @@ async function testDataFetcher() {
   console.log()
 
   const cryptoSymbol = 'BTC'
-  const stockSymbol = '600000'
+  const stockSymbol = '000001'
 
   console.log(`测试加密货币 (${cryptoSymbol}) - WebSocket 实时数据:`)
   try {

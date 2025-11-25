@@ -113,13 +113,32 @@ class CryptoDataFetcher {
     })
   }
 
+  private findOriginalSymbol(binanceSymbol: string): string | undefined {
+    // Find which original symbol maps to this binance symbol
+    for (const [originalSymbol] of this.callbacks) {
+      const config = getBinanceSymbol(originalSymbol)
+      if (config === binanceSymbol.toLowerCase()) {
+        return originalSymbol
+      }
+    }
+    return undefined
+  }
+
   private handleMessage(data: string) {
     try {
       const message = JSON.parse(data) as BinanceTickerData
       
       if (message.e === '24hrTicker') {
+        console.log(`Received ticker data for ${message.s}`)
         const quoteData = this.parseTickerData(message)
-        this.notifyCallbacks(quoteData.symbol, quoteData)
+        // Find the original symbol key that this ticker data belongs to
+        const originalSymbol = this.findOriginalSymbol(message.s)
+        if (originalSymbol) {
+          console.log(`Mapped ${message.s} to ${originalSymbol}, notifying callbacks`)
+          this.notifyCallbacks(originalSymbol, quoteData)
+        } else {
+          console.warn(`No callback found for binance symbol ${message.s}`)
+        }
       }
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error)
@@ -178,7 +197,9 @@ class CryptoDataFetcher {
         id: Date.now()
       }
       this.ws.send(JSON.stringify(subscribeMsg))
-      console.log(`Subscribed to ${binanceSymbol}`)
+      console.log(`Subscribed to ${binanceSymbol}@ticker`)
+    } else {
+      console.warn(`Cannot subscribe to ${binanceSymbol}: WebSocket not connected`)
     }
   }
 
