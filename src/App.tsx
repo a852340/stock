@@ -3,6 +3,7 @@ import { StockList } from './components/StockList'
 import { MainContent } from './components/MainContent'
 import { Settings } from './components/Settings'
 import { useDataFeed } from './hooks/useDataFeed'
+import { useKeyboardNavigation } from './hooks/useKeyboardNavigation'
 import { dataFetcher } from './services/dataFetcher'
 import { useStockStore } from './store/stockStore'
 import './App.css'
@@ -11,6 +12,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { loadInitialStocks } = useStockStore()
   useDataFeed()
+  useKeyboardNavigation()
 
   useEffect(() => {
     loadInitialStocks()
