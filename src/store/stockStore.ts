@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { QuoteData } from '../types/quote'
+import { QuoteData, BarData } from '../types/quote'
 import { SUPPORTED_SYMBOLS } from '../config/dataSourceConfig'
 import { storageService } from '../services/storageService'
 
@@ -21,12 +21,16 @@ interface StockStore {
   stocks: Stock[]
   selectedStock: Stock | null
   quotesData: Map<string, QuoteData>
+  intradayBars: Map<string, BarData[]>
   pollInterval: number
   setSelectedStock: (stock: Stock | null) => void
   addStock: (stock: Stock) => Promise<void>
   removeStock: (code: string) => Promise<void>
   updateQuoteData: (symbol: string, data: QuoteData) => void
   getQuoteData: (symbol: string) => QuoteData | undefined
+  updateIntradayData: (symbol: string, bars: BarData[]) => void
+  getIntradayData: (symbol: string) => BarData[] | undefined
+  updateLatestBar: (symbol: string, bar: BarData) => void
   setPollInterval: (interval: number) => Promise<void>
   loadInitialStocks: () => Promise<void>
 }
@@ -43,6 +47,7 @@ export const useStockStore = create<StockStore>((set, get) => ({
   stocks: getDefaultStocks(),
   selectedStock: null,
   quotesData: new Map(),
+  intradayBars: new Map(),
   pollInterval: 5000,
   
   setSelectedStock: (stock) => set({ selectedStock: stock }),
@@ -116,6 +121,45 @@ export const useStockStore = create<StockStore>((set, get) => ({
   getQuoteData: (symbol) => {
     return get().quotesData.get(symbol)
   },
+
+  updateIntradayData: (symbol, bars) => set((state) => {
+    console.log('[stockStore] Updating intraday data for', symbol, 'bars:', bars.length)
+    
+    const newIntradayBars = new Map(state.intradayBars)
+    newIntradayBars.set(symbol, bars)
+    
+    return {
+      intradayBars: newIntradayBars
+    }
+  }),
+
+  getIntradayData: (symbol) => {
+    return get().intradayBars.get(symbol)
+  },
+
+  updateLatestBar: (symbol, bar) => set((state) => {
+    console.log('[stockStore] Updating latest bar for', symbol, ':', {
+      time: bar.time,
+      close: bar.close,
+      volume: bar.volume
+    })
+    
+    const bars = state.intradayBars.get(symbol) || []
+    const updated = [...bars]
+    
+    if (updated.length > 0 && updated[updated.length - 1].time === bar.time) {
+      updated[updated.length - 1] = bar
+    } else {
+      updated.push(bar)
+    }
+    
+    const newIntradayBars = new Map(state.intradayBars)
+    newIntradayBars.set(symbol, updated)
+    
+    return {
+      intradayBars: newIntradayBars
+    }
+  }),
   
   setPollInterval: async (interval) => {
     set({ pollInterval: interval })

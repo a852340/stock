@@ -18,3 +18,18 @@ export interface SymbolConfig {
   type: 'crypto' | 'stock'
   okxSymbol?: string
 }
+
+export interface BarData {
+  time: number | string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume?: number
+}
+
+export interface IntradayData {
+  symbol: string
+  bars: BarData[]
+  lastUpdate: number
+}
