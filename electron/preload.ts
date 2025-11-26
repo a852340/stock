@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronStore', {
   reset: () => ipcRenderer.invoke('electron-store-reset'),
 })
 
+// Expose cryptoWS API for WebSocket communication
 contextBridge.exposeInMainWorld('cryptoWS', {
   subscribe: (symbol: string) => {
     console.log('[Preload] Crypto subscribe request:', symbol)
@@ -42,7 +43,10 @@ contextBridge.exposeInMainWorld('cryptoWS', {
     console.log('[Preload] Crypto disconnect request')
     return ipcRenderer.invoke('crypto-disconnect')
   },
-  isConnected: () => ipcRenderer.invoke('crypto-is-connected'),
+  isConnected: () => {
+    console.log('[Preload] Crypto is connected check')
+    return ipcRenderer.invoke('crypto-is-connected')
+  },
   on: (channel: string, listener: (...args: any[]) => void) => {
     console.log('[Preload] Registering listener for channel:', channel)
     return ipcRenderer.on(channel, (_event, ...args) => listener(...args))

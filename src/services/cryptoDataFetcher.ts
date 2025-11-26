@@ -3,19 +3,6 @@ import { defaultConfig, getBinanceSymbol } from '../config/dataSourceConfig'
 
 type TickerCallback = (data: QuoteData) => void
 
-declare global {
-  interface Window {
-    cryptoWS?: {
-      subscribe: (symbol: string) => Promise<boolean>
-      unsubscribe: (symbol: string) => Promise<boolean>
-      disconnect: () => Promise<boolean>
-      isConnected: () => Promise<boolean>
-      on: (channel: string, listener: (data: any) => void) => void
-      off: (channel: string, listener: any) => void
-    }
-  }
-}
-
 class CryptoDataFetcher {
   private subscribedSymbols: Set<string> = new Set()
   private callbacks: Map<string, TickerCallback[]> = new Map()
@@ -24,14 +11,25 @@ class CryptoDataFetcher {
 
   constructor(_config = defaultConfig.crypto) {}
 
+  private checkApiAvailable(): boolean {
+    if (typeof window === 'undefined') {
+      console.error('[CryptoDataFetcher] window is not available')
+      return false
+    }
+    if (!window.cryptoWS) {
+      console.error('[CryptoDataFetcher] cryptoWS API not available')
+      return false
+    }
+    return true
+  }
+
   private async initialize(): Promise<void> {
     if (this.initialized) {
       return
     }
 
-    if (!window.cryptoWS) {
-      console.error('[CryptoDataFetcher] cryptoWS API not available')
-      return
+    if (!this.checkApiAvailable()) {
+      throw new Error('cryptoWS API not available')
     }
 
     console.log('[CryptoDataFetcher] Initializing message listener')
@@ -84,13 +82,19 @@ class CryptoDataFetcher {
 
     await this.initialize()
 
-    if (!window.cryptoWS) {
+    if (!this.checkApiAvailable()) {
       throw new Error('cryptoWS API not available')
     }
 
     console.log('[CryptoDataFetcher] Sending subscribe to main process:', symbol)
-    await window.cryptoWS.subscribe(symbol)
-    this.subscribedSymbols.add(symbol)
+    try {
+      await window.cryptoWS.subscribe(symbol)
+      this.subscribedSymbols.add(symbol)
+      console.log('[CryptoDataFetcher] Successfully subscribed to:', symbol)
+    } catch (error) {
+      console.error('[CryptoDataFetcher] Subscribe failed for', symbol, ':', error)
+      throw error
+    }
   }
 
   unsubscribe(symbol: string) {
@@ -150,10 +154,15 @@ class CryptoDataFetcher {
   }
 
   async isConnected(): Promise<boolean> {
-    if (!window.cryptoWS) {
+    if (!this.checkApiAvailable()) {
       return false
     }
-    return window.cryptoWS.isConnected()
+    try {
+      return await window.cryptoWS.isConnected()
+    } catch (error) {
+      console.error('[CryptoDataFetcher] isConnected check failed:', error)
+      return false
+    }
   }
 }
 

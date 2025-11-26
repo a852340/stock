@@ -1,21 +1,5 @@
 import { Stock } from '../store/stockStore'
 
-interface StorageData {
-  stocks: Stock[]
-  pollInterval: number
-}
-
-declare global {
-  interface Window {
-    electronStore?: {
-      get: (key: string) => Promise<unknown>
-      set: (key: string, value: unknown) => Promise<boolean>
-      getAll: () => Promise<StorageData>
-      reset: () => Promise<boolean>
-    }
-  }
-}
-
 class StorageService {
   async getSavedStocks(): Promise<Stock[]> {
     try {
