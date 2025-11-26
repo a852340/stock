@@ -1,5 +1,5 @@
 import { QuoteData } from '../types/quote'
-import { defaultConfig, getBinanceSymbol } from '../config/dataSourceConfig'
+import { defaultConfig, getOkxSymbol } from '../config/dataSourceConfig'
 
 type TickerCallback = (data: QuoteData) => void
 
@@ -32,11 +32,11 @@ class CryptoDataFetcher {
       throw new Error('cryptoWS API not available')
     }
 
-    console.log('[CryptoDataFetcher] Initializing message listener')
+    console.log('[CryptoDataFetcher] Initializing message listener for OKX')
     this.messageHandler = (data: any) => {
       console.log('[CryptoDataFetcher] Received crypto ticker:', data.symbol)
       const originalSymbol = Array.from(this.callbacks.keys()).find(
-        sym => getBinanceSymbol(sym)?.toLowerCase() === data.symbol.toLowerCase()
+        sym => getOkxSymbol(sym)?.toUpperCase() === data.symbol.toUpperCase()
       )
       
       if (originalSymbol) {
@@ -63,8 +63,8 @@ class CryptoDataFetcher {
   }
 
   async subscribe(symbol: string, callback: TickerCallback): Promise<void> {
-    const binanceSymbol = getBinanceSymbol(symbol)
-    if (!binanceSymbol) {
+    const okxSymbol = getOkxSymbol(symbol)
+    if (!okxSymbol) {
       throw new Error(`Unsupported symbol: ${symbol}`)
     }
 
@@ -98,8 +98,8 @@ class CryptoDataFetcher {
   }
 
   unsubscribe(symbol: string) {
-    const binanceSymbol = getBinanceSymbol(symbol)
-    if (!binanceSymbol || !this.subscribedSymbols.has(symbol)) {
+    const okxSymbol = getOkxSymbol(symbol)
+    if (!okxSymbol || !this.subscribedSymbols.has(symbol)) {
       return
     }
 

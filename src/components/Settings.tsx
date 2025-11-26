@@ -63,7 +63,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
             <div className="space-y-2 text-xs text-dark-textSecondary">
               <div className="flex items-start gap-2">
                 <span className="inline-block w-2 h-2 bg-green-500 rounded-full mt-1"></span>
-                <span>加密货币：使用 Binance WebSocket 实时推送（毫秒级延迟）</span>
+                <span>加密货币：使用欧意 OKX WebSocket 实时推送（毫秒级延迟）</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="inline-block w-2 h-2 bg-orange-500 rounded-full mt-1"></span>

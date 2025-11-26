@@ -18,7 +18,7 @@ export const defaultConfig: DataSourceConfig = {
   crypto: {
     enabled: true,
     useRealtime: true,
-    websocketUrl: 'wss://stream.binance.com:9443/ws'
+    websocketUrl: 'wss://wspap.okx.com:8443/ws/v5/public'
   },
   stock: {
     enabled: true,
@@ -30,8 +30,8 @@ export const defaultConfig: DataSourceConfig = {
 
 export const SUPPORTED_SYMBOLS: SymbolConfig[] = [
   // Cryptocurrencies
-  { symbol: 'BTC', name: 'Bitcoin', type: 'crypto', binanceSymbol: 'btcusdt' },
-  { symbol: 'ETH', name: 'Ethereum', type: 'crypto', binanceSymbol: 'ethusdt' },
+  { symbol: 'BTC', name: 'Bitcoin', type: 'crypto', okxSymbol: 'BTC-USDT' },
+  { symbol: 'ETH', name: 'Ethereum', type: 'crypto', okxSymbol: 'ETH-USDT' },
 
   // A-shares
   { symbol: '000001', name: '上证指数', type: 'stock' }
@@ -41,7 +41,7 @@ export function getSymbolConfig(symbol: string): SymbolConfig | undefined {
   return SUPPORTED_SYMBOLS.find(s => s.symbol === symbol)
 }
 
-export function getBinanceSymbol(symbol: string): string | undefined {
+export function getOkxSymbol(symbol: string): string | undefined {
   const config = getSymbolConfig(symbol)
-  return config?.binanceSymbol
+  return config?.okxSymbol
 }
