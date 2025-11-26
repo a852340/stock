@@ -16,11 +16,13 @@
     "@tailwindcss/typography": "^0.5.19",
     "autoprefixer": "^10.4.22",
     "axios": "^1.13.2",
+    "bufferutil": "^4.0.9",
     "electron-store": "^8.1.0",
     "postcss": "^8.5.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwindcss": "^4.1.17",
+    "utf-8-validate": "^6.0.5",
     "ws": "^8.18.3",
     "zustand": "^5.0.8"
   },
@@ -43,5 +45,16 @@
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "build": {
+    "nodeModulesDir": true,
+    "buildDependenciesFromSource": true,
+    "files": [
+      "dist",
+      "dist-electron",
+      "node_modules/ws/**/*",
+      "node_modules/bufferutil/**/*",
+      "node_modules/utf-8-validate/**/*"
+    ]
+  }
 }
