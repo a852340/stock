@@ -1,7 +1,13 @@
 import { useStockStore } from '../store/stockStore'
+import { useIntradayData } from '../hooks/useIntradayData'
+import { Chart } from './Chart'
 
 export const MainContent: React.FC = () => {
-  const { selectedStock } = useStockStore()
+  const { selectedStock, getIntradayData } = useStockStore()
+  
+  useIntradayData(selectedStock?.code || null)
+  
+  const chartData = selectedStock ? getIntradayData(selectedStock.code) : undefined
 
   const formatPrice = (price?: number) => {
     if (price === undefined) return '--'
@@ -96,10 +102,14 @@ export const MainContent: React.FC = () => {
             </div>
             
             <div className="bg-dark-primary rounded-lg p-6 border border-dark-border">
-              <h3 className="text-lg font-semibold text-dark-text mb-4">图表区域</h3>
-              <div className="h-64 bg-dark-accent rounded flex items-center justify-center">
-                <p className="text-dark-textSecondary">K线图/走势图将在此显示</p>
-              </div>
+              <h3 className="text-lg font-semibold text-dark-text mb-4">当日分时图</h3>
+              {chartData && chartData.length > 0 ? (
+                <Chart symbol={selectedStock.code} data={chartData} />
+              ) : (
+                <div className="h-96 bg-dark-accent rounded flex items-center justify-center">
+                  <p className="text-dark-textSecondary">加载分时图表数据中...</p>
+                </div>
+              )}
             </div>
             
             <div className="bg-dark-primary rounded-lg p-6 border border-dark-border">
