@@ -13,6 +13,9 @@ declare global {
       getAll: () => Promise<Record<string, any>>
       reset: () => Promise<void>
     }
+    stockApi: {
+      getIntradayData: (symbol: string) => Promise<any[]>
+    }
   }
 }
 

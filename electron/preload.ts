@@ -29,7 +29,12 @@ contextBridge.exposeInMainWorld('electronStore', {
   reset: () => ipcRenderer.invoke('electron-store-reset'),
 })
 
+contextBridge.exposeInMainWorld('stockApi', {
+  getIntradayData: (symbol: string) => ipcRenderer.invoke('stock-get-intraday', symbol),
+})
+
 console.log('[Preload] Preload script completed, APIs exposed:', {
   ipcRenderer: !!window.ipcRenderer,
-  electronStore: !!window.electronStore
+  electronStore: !!window.electronStore,
+  stockApi: !!window.stockApi
 })
