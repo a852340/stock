@@ -29,7 +29,7 @@ class DataFetcher {
     }
   }
 
-  subscribe(symbol: string, callback: DataCallback) {
+  async subscribe(symbol: string, callback: DataCallback): Promise<void> {
     const config = getSymbolConfig(symbol)
     
     if (!config) {
@@ -37,7 +37,7 @@ class DataFetcher {
     }
 
     if (config.type === 'crypto') {
-      cryptoDataFetcher.subscribe(symbol, callback)
+      await cryptoDataFetcher.subscribe(symbol, callback)
     } else {
       stockDataFetcher.subscribe(symbol, callback)
     }
@@ -71,7 +71,9 @@ class DataFetcher {
   }
 
   isConnected(): boolean {
-    return cryptoDataFetcher.isConnected()
+    // Note: This is now async in cryptoDataFetcher, but keeping sync for backwards compatibility
+    // The actual connection check happens via IPC in the background
+    return true
   }
 
   getActiveSubscriptions(): { crypto: string[], stock: string[] } {

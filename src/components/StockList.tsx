@@ -47,10 +47,13 @@ export const StockList: React.FC = () => {
         <div className="p-4 border-b border-dark-border">
           <h2 className="text-lg font-semibold text-dark-text">标的列表</h2>
           <p className="text-xs text-dark-textSecondary mt-1">点击选择或按 ↑/↓ 快速切换</p>
+          <p className="text-xs text-dark-textSecondary mt-1">总计: {stocks.length} 个标的</p>
         </div>
         
         <div className="flex-1 overflow-y-auto">
-           {stocks.map((stock) => (
+           {stocks.map((stock) => {
+             console.log('[StockList] Rendering stock:', stock.code, 'Price:', stock.price, 'Change:', stock.changePercent)
+             return (
              <div
                key={stock.code}
                ref={selectedStock?.code === stock.code ? selectedItemRef : null}
@@ -96,9 +99,10 @@ export const StockList: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+              </div>
+              )
+              })}
+              </div>
         
         <div className="p-4 border-t border-dark-border">
           <button
