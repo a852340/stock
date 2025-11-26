@@ -10,7 +10,6 @@ interface AddSymbolDialogProps {
 export const AddSymbolDialog: React.FC<AddSymbolDialogProps> = ({ isOpen, onClose }) => {
   const { stocks, addStock } = useStockStore()
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedType, setSelectedType] = useState<'all' | 'crypto' | 'stock'>('all')
 
   const availableSymbols = useMemo(() => {
     const currentCodes = new Set(stocks.map(s => s.code))
@@ -22,11 +21,9 @@ export const AddSymbolDialog: React.FC<AddSymbolDialogProps> = ({ isOpen, onClos
         symbol.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
         symbol.name.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesType = selectedType === 'all' || symbol.type === selectedType
-      
-      return matchesSearch && matchesType
+      return matchesSearch
     })
-  }, [searchTerm, selectedType, stocks])
+  }, [searchTerm, stocks])
 
   if (!isOpen) return null
 
@@ -44,14 +41,13 @@ export const AddSymbolDialog: React.FC<AddSymbolDialogProps> = ({ isOpen, onClos
 
   const handleClose = () => {
     setSearchTerm('')
-    setSelectedType('all')
     onClose()
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-dark-primary border border-dark-border rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-        <h2 className="text-xl font-semibold text-dark-text mb-4">添加标的</h2>
+        <h2 className="text-xl font-semibold text-dark-text mb-4">添加A股标的</h2>
         
         <div className="space-y-4 mb-6">
           <div>
@@ -60,32 +56,11 @@ export const AddSymbolDialog: React.FC<AddSymbolDialogProps> = ({ isOpen, onClos
             </label>
             <input
               type="text"
-              placeholder="输入代码或名称（如 BTC、ETH、600519...）"
+              placeholder="输入代码或名称（如 000001...）"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-dark-text placeholder-dark-textSecondary focus:outline-none focus:border-blue-500"
             />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-dark-text mb-2">
-              类型筛选
-            </label>
-            <div className="flex gap-2">
-              {(['all', 'crypto', 'stock'] as const).map(type => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className={`px-4 py-2 rounded transition-colors text-sm ${
-                    selectedType === type
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-dark-bgLight text-dark-text hover:bg-dark-accent'
-                  }`}
-                >
-                  {type === 'all' ? '全部' : type === 'crypto' ? '加密货币' : 'A股'}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -102,16 +77,14 @@ export const AddSymbolDialog: React.FC<AddSymbolDialogProps> = ({ isOpen, onClos
                   className="flex items-center justify-between p-3 hover:bg-dark-bgLight rounded transition-colors"
                 >
                   <div className="flex items-center gap-3 flex-1">
-                    <div>
-                      <div className="font-medium text-dark-text">{symbol.symbol}</div>
-                      <div className="text-xs text-dark-textSecondary">{symbol.name}</div>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded ml-auto ${
-                      symbol.type === 'crypto' ? 'bg-blue-500/20 text-blue-400' : 'bg-orange-500/20 text-orange-400'
-                    }`}>
-                      {symbol.type === 'crypto' ? '加密' : 'A股'}
-                    </span>
-                  </div>
+                     <div>
+                       <div className="font-medium text-dark-text">{symbol.symbol}</div>
+                       <div className="text-xs text-dark-textSecondary">{symbol.name}</div>
+                     </div>
+                     <span className="text-xs px-2 py-0.5 rounded ml-auto bg-orange-500/20 text-orange-400">
+                       A股
+                     </span>
+                   </div>
                   <button
                     onClick={() => handleAddSymbol(symbol.symbol)}
                     className="ml-3 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"

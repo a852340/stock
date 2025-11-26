@@ -45,7 +45,7 @@ export const StockList: React.FC = () => {
     <>
       <div className="stock-sidebar w-80">
         <div className="p-4 border-b border-dark-border">
-          <h2 className="text-lg font-semibold text-dark-text">标的列表</h2>
+          <h2 className="text-lg font-semibold text-dark-text">A股列表</h2>
           <p className="text-xs text-dark-textSecondary mt-1">点击选择或按 ↑/↓ 快速切换</p>
           <p className="text-xs text-dark-textSecondary mt-1">总计: {stocks.length} 个标的</p>
         </div>
@@ -82,13 +82,9 @@ export const StockList: React.FC = () => {
               </div>
               <div className="flex justify-between items-center">
                 <div>
-                  {stock.type && (
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      stock.type === 'crypto' ? 'bg-blue-500/20 text-blue-400' : 'bg-orange-500/20 text-orange-400'
-                    }`}>
-                      {stock.type === 'crypto' ? '加密' : 'A股'}
-                    </span>
-                  )}
+                  <span className="text-xs px-2 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                    A股
+                  </span>
                 </div>
                 <div className="flex flex-col items-end">
                   <div className="text-sm font-medium text-dark-text">
@@ -109,10 +105,10 @@ export const StockList: React.FC = () => {
             onClick={() => setIsAddDialogOpen(true)}
             className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm font-medium mb-2"
           >
-            + 添加标的
+            + 添加A股
           </button>
           <div className="text-xs text-dark-textSecondary">
-            共 {stocks.length} 个标的
+            共 {stocks.length} 个A股标的
           </div>
         </div>
       </div>

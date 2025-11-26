@@ -16,8 +16,8 @@ export interface DataSourceConfig {
 
 export const defaultConfig: DataSourceConfig = {
   crypto: {
-    enabled: true,
-    useRealtime: true,
+    enabled: false,
+    useRealtime: false,
     websocketUrl: 'wss://wspap.okx.com:8443/ws/v5/public'
   },
   stock: {
@@ -29,11 +29,7 @@ export const defaultConfig: DataSourceConfig = {
 }
 
 export const SUPPORTED_SYMBOLS: SymbolConfig[] = [
-  // Cryptocurrencies
-  { symbol: 'BTC', name: 'Bitcoin', type: 'crypto', okxSymbol: 'BTC-USDT' },
-  { symbol: 'ETH', name: 'Ethereum', type: 'crypto', okxSymbol: 'ETH-USDT' },
-
-  // A-shares
+  // A-shares only
   { symbol: '000001', name: '上证指数', type: 'stock' }
 ]
 

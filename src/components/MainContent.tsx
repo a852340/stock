@@ -47,27 +47,27 @@ export const MainContent: React.FC = () => {
   return (
     <div className="stock-main">
       <div className="border-b border-dark-border p-6">
-        <h1 className="text-2xl font-bold text-dark-text">
-          {selectedStock ? selectedStock.name : '股票行情应用'}
-        </h1>
-        {selectedStock && (
-          <div className="flex items-center gap-4 mt-2">
-            <p className="text-dark-textSecondary">
-              {selectedStock.code} - {selectedStock.isRealtime ? '实时数据' : '轮询数据'}
-            </p>
-            {selectedStock.dataSource && (
-              <span className="text-xs px-2 py-1 rounded bg-dark-bgLight text-dark-textSecondary">
-                数据源: {selectedStock.dataSource}
-              </span>
-            )}
-            {selectedStock.lastUpdate && (
-              <span className="text-xs text-dark-textSecondary">
-                更新时间: {formatTime(selectedStock.lastUpdate)}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+         <h1 className="text-2xl font-bold text-dark-text">
+           {selectedStock ? selectedStock.name : 'A股行情应用'}
+         </h1>
+         {selectedStock && (
+           <div className="flex items-center gap-4 mt-2">
+             <p className="text-dark-textSecondary">
+               {selectedStock.code} - A股
+             </p>
+             {selectedStock.dataSource && (
+               <span className="text-xs px-2 py-1 rounded bg-dark-bgLight text-dark-textSecondary">
+                 数据源: {selectedStock.dataSource}
+               </span>
+             )}
+             {selectedStock.lastUpdate && (
+               <span className="text-xs text-dark-textSecondary">
+                 更新时间: {formatTime(selectedStock.lastUpdate)}
+               </span>
+             )}
+           </div>
+         )}
+       </div>
       
       <div className="flex-1 p-6">
         {selectedStock ? (
@@ -116,22 +116,16 @@ export const MainContent: React.FC = () => {
                   <div className="font-mono text-dark-text">{formatVolume(selectedStock.volume)}</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-dark-textSecondary">
-                    {selectedStock.type === 'crypto' ? '成交额' : '市值'}
-                  </div>
+                  <div className="text-sm text-dark-textSecondary">市值</div>
                   <div className="font-mono text-dark-text">{formatMarketCap(selectedStock.marketCap)}</div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-dark-textSecondary">标的类型</div>
-                  <div className="font-mono text-dark-text">
-                    {selectedStock.type === 'crypto' ? '加密货币' : 'A股'}
-                  </div>
+                  <div className="font-mono text-dark-text">A股</div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-dark-textSecondary">数据模式</div>
-                  <div className="font-mono text-dark-text">
-                    {selectedStock.isRealtime ? 'WebSocket 实时' : 'HTTP 轮询'}
-                  </div>
+                  <div className="font-mono text-dark-text">HTTP 轮询</div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-dark-textSecondary">数据源</div>
@@ -146,15 +140,15 @@ export const MainContent: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="bg-dark-primary rounded-lg p-8 border border-dark-border max-w-md">
               <h3 className="text-xl font-semibold text-dark-text mb-4">
-                欢迎使用股票行情应用
+                欢迎使用A股行情应用
               </h3>
               <p className="text-dark-textSecondary mb-6">
-                请从左侧列表选择一个股票标的开始查看行情数据
+                请从左侧列表选择一个A股标的开始查看行情数据
               </p>
               <div className="space-y-3 text-left">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-sm text-dark-textSecondary">实时行情数据展示</span>
+                  <span className="text-sm text-dark-textSecondary">实时A股行情数据展示</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -162,7 +156,7 @@ export const MainContent: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-sm text-dark-textSecondary">多股票监控管理</span>
+                  <span className="text-sm text-dark-textSecondary">A股监控管理</span>
                 </div>
               </div>
             </div>
