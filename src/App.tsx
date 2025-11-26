@@ -11,15 +11,21 @@ import './App.css'
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { loadInitialStocks } = useStockStore()
+  
+  console.log('[App] Component initialized')
+  
   useDataFeed()
   useKeyboardNavigation()
 
   useEffect(() => {
+    console.log('[App] Loading initial stocks')
     loadInitialStocks()
   }, [loadInitialStocks])
 
   useEffect(() => {
+    console.log('[App] App mounted, setting up cleanup')
     return () => {
+      console.log('[App] Unmounting, disconnecting data fetcher')
       dataFetcher.disconnect()
     }
   }, [])

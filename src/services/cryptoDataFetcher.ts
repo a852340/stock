@@ -1,172 +1,67 @@
-import WebSocket from 'ws'
 import { QuoteData } from '../types/quote'
 import { defaultConfig, getBinanceSymbol } from '../config/dataSourceConfig'
 
-interface BinanceTickerData {
-  e: string
-  E: number
-  s: string
-  p: string
-  P: string
-  c: string
-  Q: string
-  o: string
-  h: string
-  l: string
-  v: string
-  q: string
-}
-
 type TickerCallback = (data: QuoteData) => void
 
+declare global {
+  interface Window {
+    cryptoWS?: {
+      subscribe: (symbol: string) => Promise<boolean>
+      unsubscribe: (symbol: string) => Promise<boolean>
+      disconnect: () => Promise<boolean>
+      isConnected: () => Promise<boolean>
+      on: (channel: string, listener: (data: any) => void) => void
+      off: (channel: string, listener: any) => void
+    }
+  }
+}
+
 class CryptoDataFetcher {
-  private ws: WebSocket | null = null
   private subscribedSymbols: Set<string> = new Set()
   private callbacks: Map<string, TickerCallback[]> = new Map()
-  private reconnectTimeout: NodeJS.Timeout | null = null
-  private heartbeatInterval: NodeJS.Timeout | null = null
-  private isConnecting = false
-  private shouldReconnect = true
+  private messageHandler: ((data: any) => void) | null = null
+  private initialized = false
 
-  constructor(private config = defaultConfig.crypto) {}
+  constructor(_config = defaultConfig.crypto) {}
 
-  connect(): Promise<void> {
-    if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) {
-      return Promise.resolve()
+  private async initialize(): Promise<void> {
+    if (this.initialized) {
+      return
     }
 
-    this.isConnecting = true
-    
-    return new Promise((resolve, reject) => {
-      try {
-        this.ws = new WebSocket(this.config.websocketUrl)
-
-        this.ws.on('open', () => {
-          console.log('Binance WebSocket connected')
-          this.isConnecting = false
-          this.startHeartbeat()
-          this.resubscribeAll()
-          resolve()
-        })
-
-        this.ws.on('message', (data: WebSocket.Data) => {
-          this.handleMessage(data.toString())
-        })
-
-        this.ws.on('error', (error) => {
-          console.error('Binance WebSocket error:', error)
-          this.isConnecting = false
-          reject(error)
-        })
-
-        this.ws.on('close', () => {
-          console.log('Binance WebSocket closed')
-          this.isConnecting = false
-          this.stopHeartbeat()
-          if (this.shouldReconnect) {
-            this.scheduleReconnect()
-          }
-        })
-      } catch (error) {
-        this.isConnecting = false
-        reject(error)
-      }
-    })
-  }
-
-  private startHeartbeat() {
-    this.heartbeatInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.ping()
-      }
-    }, 30000)
-  }
-
-  private stopHeartbeat() {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval)
-      this.heartbeatInterval = null
+    if (!window.cryptoWS) {
+      console.error('[CryptoDataFetcher] cryptoWS API not available')
+      return
     }
-  }
 
-  private scheduleReconnect() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout)
-    }
-    
-    this.reconnectTimeout = setTimeout(() => {
-      console.log('Attempting to reconnect...')
-      this.connect().catch(err => {
-        console.error('Reconnect failed:', err)
-      })
-    }, 5000)
-  }
-
-  private resubscribeAll() {
-    const symbols = Array.from(this.subscribedSymbols)
-    this.subscribedSymbols.clear()
-    symbols.forEach(symbol => {
-      const binanceSymbol = getBinanceSymbol(symbol)
-      if (binanceSymbol) {
-        this.subscribeInternal(binanceSymbol)
-      }
-    })
-  }
-
-  private findOriginalSymbol(binanceSymbol: string): string | undefined {
-    // Find which original symbol maps to this binance symbol
-    for (const [originalSymbol] of this.callbacks) {
-      const config = getBinanceSymbol(originalSymbol)
-      if (config === binanceSymbol.toLowerCase()) {
-        return originalSymbol
-      }
-    }
-    return undefined
-  }
-
-  private handleMessage(data: string) {
-    try {
-      const message = JSON.parse(data) as BinanceTickerData
+    console.log('[CryptoDataFetcher] Initializing message listener')
+    this.messageHandler = (data: any) => {
+      console.log('[CryptoDataFetcher] Received crypto ticker:', data.symbol)
+      const originalSymbol = Array.from(this.callbacks.keys()).find(
+        sym => getBinanceSymbol(sym)?.toLowerCase() === data.symbol.toLowerCase()
+      )
       
-      if (message.e === '24hrTicker') {
-        console.log(`Received ticker data for ${message.s}`)
-        const quoteData = this.parseTickerData(message)
-        // Find the original symbol key that this ticker data belongs to
-        const originalSymbol = this.findOriginalSymbol(message.s)
-        if (originalSymbol) {
-          console.log(`Mapped ${message.s} to ${originalSymbol}, notifying callbacks`)
-          this.notifyCallbacks(originalSymbol, quoteData)
-        } else {
-          console.warn(`No callback found for binance symbol ${message.s}`)
+      if (originalSymbol) {
+        const quoteData: QuoteData = {
+          symbol: data.symbol,
+          name: data.name,
+          price: data.price,
+          change24h: data.change24h,
+          changeAmount: data.changeAmount,
+          volume: data.volume,
+          marketCap: data.marketCap,
+          type: data.type,
+          dataSource: data.dataSource,
+          isRealtime: data.isRealtime,
+          lastUpdate: data.lastUpdate
         }
+        console.log('[CryptoDataFetcher] Notifying callbacks for', originalSymbol)
+        this.notifyCallbacks(originalSymbol, quoteData)
       }
-    } catch (error) {
-      console.error('Failed to parse WebSocket message:', error)
     }
-  }
 
-  private parseTickerData(ticker: BinanceTickerData): QuoteData {
-    const price = parseFloat(ticker.c)
-    const priceChangePercent = parseFloat(ticker.P)
-    const priceChange = parseFloat(ticker.p)
-    const volume = parseFloat(ticker.v)
-    const quoteVolume = parseFloat(ticker.q)
-
-    const symbol = ticker.s.replace('USDT', '').toUpperCase()
-
-    return {
-      symbol,
-      name: symbol,
-      price,
-      change24h: priceChangePercent,
-      changeAmount: priceChange,
-      volume,
-      marketCap: quoteVolume,
-      type: 'crypto',
-      dataSource: 'binance',
-      isRealtime: true,
-      lastUpdate: ticker.E
-    }
+    window.cryptoWS.on('crypto-ticker-update', this.messageHandler)
+    this.initialized = true
   }
 
   async subscribe(symbol: string, callback: TickerCallback): Promise<void> {
@@ -175,32 +70,27 @@ class CryptoDataFetcher {
       throw new Error(`Unsupported symbol: ${symbol}`)
     }
 
+    console.log('[CryptoDataFetcher] Subscribe request for:', symbol)
+
     if (!this.callbacks.has(symbol)) {
       this.callbacks.set(symbol, [])
     }
     this.callbacks.get(symbol)!.push(callback)
 
     if (this.subscribedSymbols.has(symbol)) {
+      console.log('[CryptoDataFetcher] Already subscribed to:', symbol)
       return
     }
 
-    await this.connect()
-    this.subscribeInternal(binanceSymbol)
-    this.subscribedSymbols.add(symbol)
-  }
+    await this.initialize()
 
-  private subscribeInternal(binanceSymbol: string) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      const subscribeMsg = {
-        method: 'SUBSCRIBE',
-        params: [`${binanceSymbol}@ticker`],
-        id: Date.now()
-      }
-      this.ws.send(JSON.stringify(subscribeMsg))
-      console.log(`Subscribed to ${binanceSymbol}@ticker`)
-    } else {
-      console.warn(`Cannot subscribe to ${binanceSymbol}: WebSocket not connected`)
+    if (!window.cryptoWS) {
+      throw new Error('cryptoWS API not available')
     }
+
+    console.log('[CryptoDataFetcher] Sending subscribe to main process:', symbol)
+    await window.cryptoWS.subscribe(symbol)
+    this.subscribedSymbols.add(symbol)
   }
 
   unsubscribe(symbol: string) {
@@ -209,51 +99,61 @@ class CryptoDataFetcher {
       return
     }
 
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      const unsubscribeMsg = {
-        method: 'UNSUBSCRIBE',
-        params: [`${binanceSymbol}@ticker`],
-        id: Date.now()
-      }
-      this.ws.send(JSON.stringify(unsubscribeMsg))
+    console.log('[CryptoDataFetcher] Unsubscribe request for:', symbol)
+
+    if (!window.cryptoWS) {
+      return
     }
+
+    window.cryptoWS.unsubscribe(symbol).catch(err => {
+      console.error('[CryptoDataFetcher] Unsubscribe error:', err)
+    })
 
     this.subscribedSymbols.delete(symbol)
     this.callbacks.delete(symbol)
-    console.log(`Unsubscribed from ${binanceSymbol}`)
   }
 
   private notifyCallbacks(symbol: string, data: QuoteData) {
     const callbacks = this.callbacks.get(symbol)
     if (callbacks) {
-      callbacks.forEach(callback => callback(data))
+      console.log('[CryptoDataFetcher] Calling', callbacks.length, 'callbacks for', symbol)
+      callbacks.forEach(callback => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[CryptoDataFetcher] Callback error:', error)
+        }
+      })
     }
   }
 
   disconnect() {
-    this.shouldReconnect = false
-    this.stopHeartbeat()
-    
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout)
-      this.reconnectTimeout = null
+    console.log('[CryptoDataFetcher] Disconnect')
+    if (this.messageHandler && window.cryptoWS) {
+      window.cryptoWS.off('crypto-ticker-update', this.messageHandler)
+      this.messageHandler = null
     }
 
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
+    if (window.cryptoWS) {
+      window.cryptoWS.disconnect().catch(err => {
+        console.error('[CryptoDataFetcher] Disconnect error:', err)
+      })
     }
 
     this.subscribedSymbols.clear()
     this.callbacks.clear()
+    this.initialized = false
   }
 
   getSubscribedSymbols(): string[] {
     return Array.from(this.subscribedSymbols)
   }
 
-  isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN
+  async isConnected(): Promise<boolean> {
+    if (!window.cryptoWS) {
+      return false
+    }
+    return window.cryptoWS.isConnected()
   }
 }
 

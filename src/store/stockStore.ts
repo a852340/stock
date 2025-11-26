@@ -72,12 +72,18 @@ export const useStockStore = create<StockStore>((set, get) => ({
   },
   
   updateQuoteData: (symbol, data) => set((state) => {
+    console.log('[stockStore] Updating quote data for', symbol, ':', {
+      price: data.price,
+      change24h: data.change24h,
+      type: data.type
+    })
+    
     const newQuotesData = new Map(state.quotesData)
     newQuotesData.set(symbol, data)
     
     const updatedStocks = state.stocks.map(stock => {
       if (stock.code === symbol) {
-        return {
+        const updatedStock = {
           ...stock,
           name: data.name,
           price: data.price,
@@ -90,6 +96,8 @@ export const useStockStore = create<StockStore>((set, get) => ({
           volume: data.volume,
           marketCap: data.marketCap
         }
+        console.log('[stockStore] Updated stock:', symbol, updatedStock)
+        return updatedStock
       }
       return stock
     })
