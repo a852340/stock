@@ -26,11 +26,9 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 let cryptoWs: WebSocket | null = null
-let cryptoSubscriptions = new Map<string, Set<string>>()
-let cryptoReconnectTimeout: NodeJS.Timeout | null = null
+const cryptoSubscriptions = new Map<string, Set<string>>()
 let cryptoHeartbeatInterval: NodeJS.Timeout | null = null
 let cryptoConnecting = false
-let shouldReconnectCrypto = true
 
 interface StorageData {
   stocks: unknown[]
@@ -60,15 +58,15 @@ function connectCryptoWebSocket(): Promise<void> {
   }
 
   cryptoConnecting = true
-  const wsUrl = 'wss://stream.binance.com:9443/ws'
-  console.log('[Crypto] WebSocket connecting to:', wsUrl)
+  const wsUrl = 'wss://wspap.okx.com:8443/ws/v5/public'
+  console.log('[Crypto] WebSocket connecting to OKX:', wsUrl)
 
   return new Promise((resolve, reject) => {
     try {
       cryptoWs = new WebSocket(wsUrl)
 
       cryptoWs.on('open', () => {
-        console.log('✅ [Crypto] WebSocket connected to Binance')
+        console.log('✅ [Crypto] WebSocket connected to OKX')
         cryptoConnecting = false
         startCryptoHeartbeat()
         resubscribeAllCrypto()
@@ -86,12 +84,9 @@ function connectCryptoWebSocket(): Promise<void> {
       })
 
       cryptoWs.on('close', () => {
-        console.log('❌ [Crypto] WebSocket closed')
+        console.log('❌ [Crypto] WebSocket closed - not reconnecting (OKX mode)')
         cryptoConnecting = false
         stopCryptoHeartbeat()
-        if (shouldReconnectCrypto) {
-          scheduleCryptoReconnect()
-        }
       })
     } catch (error) {
       cryptoConnecting = false
@@ -116,68 +111,83 @@ function stopCryptoHeartbeat() {
   }
 }
 
-function scheduleCryptoReconnect() {
-  if (cryptoReconnectTimeout) {
-    clearTimeout(cryptoReconnectTimeout)
-  }
-  
-  cryptoReconnectTimeout = setTimeout(() => {
-    console.log('[Crypto] Attempting to reconnect...')
-    connectCryptoWebSocket().catch(err => {
-      console.error('[Crypto] Reconnect failed:', err)
-    })
-  }, 5000)
-}
-
 function resubscribeAllCrypto() {
   console.log('[Crypto] Resubscribing to all symbols...')
-  cryptoSubscriptions.forEach((symbols, _channel) => {
+  cryptoSubscriptions.forEach((symbols) => {
     symbols.forEach(symbol => {
-      const binanceSymbol = symbol.toLowerCase() + 'usdt'
-      subscribeToCryptoSymbol(binanceSymbol)
+      const okxSymbol = getOkxSymbol(symbol)
+      if (okxSymbol) {
+        subscribeToCryptoSymbol(okxSymbol)
+      }
     })
   })
 }
 
-function subscribeToCryptoSymbol(binanceSymbol: string) {
+function getOkxSymbol(symbol: string): string | undefined {
+  const symbolMap: Record<string, string> = {
+    'BTC': 'BTC-USDT',
+    'ETH': 'ETH-USDT',
+    'SOL': 'SOL-USDT',
+    'XRP': 'XRP-USDT',
+    'ADA': 'ADA-USDT'
+  }
+  return symbolMap[symbol]
+}
+
+function subscribeToCryptoSymbol(okxSymbol: string) {
   if (cryptoWs?.readyState === WebSocket.OPEN) {
     const subscribeMsg = {
-      method: 'SUBSCRIBE',
-      params: [`${binanceSymbol}@ticker`],
-      id: Date.now()
+      op: 'subscribe',
+      args: [
+        {
+          channel: 'ticker',
+          instId: okxSymbol
+        }
+      ]
     }
     cryptoWs.send(JSON.stringify(subscribeMsg))
-    console.log(`✅ [Crypto] Subscribed to ${binanceSymbol}@ticker`)
+    console.log(`✅ [Crypto] Subscribed to OKX ticker for ${okxSymbol}`)
   } else {
-    console.warn(`⚠️ [Crypto] Cannot subscribe to ${binanceSymbol}: WebSocket not connected`)
+    console.warn(`⚠️ [Crypto] Cannot subscribe to ${okxSymbol}: WebSocket not connected`)
   }
 }
 
 function handleCryptoMessage(data: string) {
   try {
-    const message = JSON.parse(data) as any
+    const message = JSON.parse(data) as Record<string, unknown>
     
-    if (message.e === '24hrTicker') {
-      console.log(`📨 [Crypto] Received ticker data for ${message.s}`)
+    const arg = message.arg as Record<string, unknown> | undefined
+    const messageData = message.data as unknown[] | undefined
+    if (arg?.channel === 'ticker' && messageData && Array.isArray(messageData)) {
+      const tickerData = messageData[0] as Record<string, unknown>
+      const instId = String(tickerData.instId)
+      
+      console.log(`📨 [Crypto] Received OKX ticker data for ${instId}`)
       console.log('[Crypto] Raw data:', {
-        symbol: message.s,
-        price: message.c,
-        changePercent: message.P,
-        changeAmount: message.p
+        instId: instId,
+        price: tickerData.last,
+        open24h: tickerData.open24h,
+        high24h: tickerData.high24h,
+        low24h: tickerData.low24h
       })
       
+      const symbolName = instId.split('-')[0]
+      const currentPrice = parseFloat(String(tickerData.last))
+      const open24h = parseFloat(String(tickerData.open24h))
+      const change24h = ((currentPrice - open24h) / open24h) * 100
+      
       const quoteData = {
-        symbol: message.s.replace('USDT', '').toUpperCase(),
-        name: message.s.replace('USDT', '').toUpperCase(),
-        price: parseFloat(message.c),
-        change24h: parseFloat(message.P),
-        changeAmount: parseFloat(message.p),
-        volume: parseFloat(message.v),
-        marketCap: parseFloat(message.q),
-        type: 'crypto',
-        dataSource: 'binance',
+        symbol: symbolName,
+        name: symbolName,
+        price: currentPrice,
+        change24h: change24h,
+        changeAmount: currentPrice - open24h,
+        volume: parseFloat(String(tickerData.volCcy24h) || '0'),
+        marketCap: undefined,
+        type: 'crypto' as const,
+        dataSource: 'okx' as const,
         isRealtime: true,
-        lastUpdate: message.E
+        lastUpdate: parseInt(String(tickerData.ts))
       }
       
       if (win) {
@@ -218,8 +228,10 @@ function setupIpcHandlers() {
     cryptoSubscriptions.get('main')!.add(symbol)
     
     await connectCryptoWebSocket()
-    const binanceSymbol = symbol.toLowerCase() + 'usdt'
-    subscribeToCryptoSymbol(binanceSymbol)
+    const okxSymbol = getOkxSymbol(symbol)
+    if (okxSymbol) {
+      subscribeToCryptoSymbol(okxSymbol)
+    }
     return true
   })
 
@@ -230,27 +242,27 @@ function setupIpcHandlers() {
     }
     
     if (cryptoWs?.readyState === WebSocket.OPEN) {
-      const binanceSymbol = symbol.toLowerCase() + 'usdt'
-      const unsubscribeMsg = {
-        method: 'UNSUBSCRIBE',
-        params: [`${binanceSymbol}@ticker`],
-        id: Date.now()
+      const okxSymbol = getOkxSymbol(symbol)
+      if (okxSymbol) {
+        const unsubscribeMsg = {
+          op: 'unsubscribe',
+          args: [
+            {
+              channel: 'ticker',
+              instId: okxSymbol
+            }
+          ]
+        }
+        cryptoWs.send(JSON.stringify(unsubscribeMsg))
+        console.log(`✅ [Crypto] Unsubscribed from OKX ticker for ${okxSymbol}`)
       }
-      cryptoWs.send(JSON.stringify(unsubscribeMsg))
-      console.log(`✅ [Crypto] Unsubscribed from ${binanceSymbol}`)
     }
     return true
   })
 
   ipcMain.handle('crypto-disconnect', () => {
     console.log('[Crypto IPC] Disconnect request')
-    shouldReconnectCrypto = false
     stopCryptoHeartbeat()
-    
-    if (cryptoReconnectTimeout) {
-      clearTimeout(cryptoReconnectTimeout)
-      cryptoReconnectTimeout = null
-    }
 
     if (cryptoWs) {
       cryptoWs.close()

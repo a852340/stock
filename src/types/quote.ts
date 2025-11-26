@@ -7,7 +7,7 @@ export interface QuoteData {
   marketCap?: number
   volume?: number
   type: 'crypto' | 'stock'
-  dataSource: 'binance' | 'tencent' | 'sina'
+  dataSource: 'okx' | 'tencent' | 'sina'
   isRealtime: boolean
   lastUpdate: number
 }
@@ -16,5 +16,5 @@ export interface SymbolConfig {
   symbol: string
   name: string
   type: 'crypto' | 'stock'
-  binanceSymbol?: string
+  okxSymbol?: string
 }
