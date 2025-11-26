@@ -70,10 +70,7 @@ class StockDataFetcher {
     
     const url = `https://qt.gtimg.cn/q=${fullSymbol}`
     const response = await axios.get(url, {
-      timeout: 5000,
-      headers: {
-        'Referer': 'https://stockapp.finance.qq.com'
-      }
+      timeout: 5000
     })
 
     const data = response.data
@@ -121,9 +118,6 @@ class StockDataFetcher {
     const url = `https://hq.sinajs.cn/list=${fullSymbol}`
     const response = await axios.get(url, {
       timeout: 5000,
-      headers: {
-        'Referer': 'https://finance.sina.com.cn'
-      },
       responseType: 'text'
     })
 
@@ -271,9 +265,6 @@ class StockDataFetcher {
     try {
       const response = await axios.get(url, {
         timeout: 5000,
-        headers: {
-          'Referer': 'https://stockapp.finance.qq.com'
-        },
         responseType: 'json'
       })
 
@@ -323,9 +314,6 @@ class StockDataFetcher {
     try {
       const response = await axios.get(url, {
         timeout: 5000,
-        headers: {
-          'Referer': 'https://finance.sina.com.cn'
-        },
         responseType: 'json'
       })
 
