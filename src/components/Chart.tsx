@@ -8,22 +8,41 @@ interface ChartProps {
   data: BarData[]
 }
 
-export const Chart: React.FC<ChartProps> = ({ data }) => {
+export const Chart: React.FC<ChartProps> = ({ symbol, data }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<unknown>(null)
 
   useEffect(() => {
-    if (!containerRef.current || !data || data.length === 0) return
+    console.log('[Chart] Rendering chart for symbol:', symbol)
+    console.log('[Chart] Data points:', data?.length || 0)
+    
+    if (!containerRef.current) {
+      console.error('[Chart] ❌ Container ref is null')
+      return
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('[Chart] ⚠️ No data to display')
+      return
+    }
 
     const container = containerRef.current
     const width = container.clientWidth
     const height = container.clientHeight
 
-    if (width <= 0 || height <= 0) return
+    console.log('[Chart] Container dimensions:', { width, height })
+
+    if (width <= 0 || height <= 0) {
+      console.error('[Chart] ❌ Container has invalid dimensions')
+      return
+    }
 
     try {
+      console.log('[Chart] Creating chart with', data.length, 'bars')
+      
       if (chartRef.current) {
+        console.log('[Chart] Removing previous chart instance')
         chartRef.current.remove()
       }
 
@@ -47,6 +66,8 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
         }
       })
 
+      console.log('[Chart] Chart instance created')
+
       const series = (chart as unknown as { addCandlestickSeries: (options: unknown) => unknown }).addCandlestickSeries({
         upColor: '#22c55e',
         downColor: '#ef4444',
@@ -55,6 +76,8 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
         wickUpColor: '#22c55e',
         wickDownColor: '#ef4444'
       })
+
+      console.log('[Chart] Candlestick series created')
 
       interface ChartBar {
         time: number
@@ -76,18 +99,28 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
         close: bar.close
       }))
 
+      console.log('[Chart] ✅ Converted', chartBars.length, 'bars to chart format')
+      console.log('[Chart] First bar:', JSON.stringify(chartBars[0]))
+      console.log('[Chart] Last bar:', JSON.stringify(chartBars[chartBars.length - 1]))
+
       const setDataFn = (series as unknown as { setData: (data: unknown) => void }).setData
       setDataFn(chartBars)
+      console.log('[Chart] Data set on series')
+      
       chart.timeScale().fitContent()
+      console.log('[Chart] Time scale fitted to content')
 
       chartRef.current = chart
       seriesRef.current = series as unknown
+
+      console.log('[Chart] ✅ Chart rendered successfully')
 
       const handleResize = () => {
         if (containerRef.current && chartRef.current) {
           const newWidth = containerRef.current.clientWidth
           const newHeight = containerRef.current.clientHeight
           if (newWidth > 0 && newHeight > 0) {
+            console.log('[Chart] Resizing chart to:', { newWidth, newHeight })
             chartRef.current.applyOptions({
               width: newWidth,
               height: newHeight
@@ -99,15 +132,17 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
       window.addEventListener('resize', handleResize)
 
       return () => {
+        console.log('[Chart] Removing resize listener')
         window.removeEventListener('resize', handleResize)
       }
     } catch (error) {
-      console.error('[Chart] Error creating chart:', error)
+      console.error('[Chart] ❌ Error creating chart:', error)
     }
-  }, [data])
+  }, [data, symbol])
 
   useEffect(() => {
     return () => {
+      console.log('[Chart] Cleanup: Removing chart instance')
       if (chartRef.current) {
         chartRef.current.remove()
         chartRef.current = null

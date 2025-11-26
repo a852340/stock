@@ -262,25 +262,34 @@ class StockDataFetcher {
     
     const url = `https://ifzq.gtimg.cn/appstock/app/fqkline/get?param=${fullSymbol},day,1,`
     
+    console.log('[stockDataFetcher] Calling Tencent API for:', fullSymbol, 'URL:', url)
+    
     try {
       const response = await axios.get(url, {
         timeout: 5000,
         responseType: 'json'
       })
 
+      console.log('[stockDataFetcher] ✅ Tencent API response received, code:', response.data?.code)
+
       const data = response.data
       if (!data || data.code !== 0) {
+        console.error('[stockDataFetcher] ❌ Invalid response code from Tencent API:', data?.code)
         throw new Error('Invalid response from Tencent intraday API')
       }
 
       if (!data.data || !data.data[fullSymbol]) {
+        console.error('[stockDataFetcher] ❌ No data for symbol in Tencent response:', fullSymbol)
         throw new Error('No intraday data in Tencent response')
       }
 
       const stockData = data.data[fullSymbol]
       if (!stockData.day || stockData.day.length === 0) {
+        console.warn('[stockDataFetcher] ⚠️ Tencent API returned no bars for:', fullSymbol)
         return []
       }
+
+      console.log('[stockDataFetcher] ✅ Tencent API returned', stockData.day.length, 'bars')
 
       return stockData.day.map((bar: string[]) => {
         const time = bar[0]
@@ -300,7 +309,7 @@ class StockDataFetcher {
         }
       })
     } catch (error) {
-      console.error('Tencent intraday fetch error:', error)
+      console.error('[stockDataFetcher] ❌ Tencent intraday fetch error:', error)
       return []
     }
   }
@@ -311,16 +320,23 @@ class StockDataFetcher {
     
     const url = `https://vip.stock.finance.sina.com.cn/q_gn/api/extral.php?symbol=${fullSymbol}&bdate=&edate=&param=&type=1&resolution=1&_s=pc`
     
+    console.log('[stockDataFetcher] Calling Sina API for:', fullSymbol, 'URL:', url)
+    
     try {
       const response = await axios.get(url, {
         timeout: 5000,
         responseType: 'json'
       })
 
+      console.log('[stockDataFetcher] ✅ Sina API response received')
+
       const data = response.data
       if (!data || !data.t || !data.o) {
+        console.warn('[stockDataFetcher] ⚠️ Sina API returned invalid data structure')
         return []
       }
+
+      console.log('[stockDataFetcher] ✅ Sina API returned', data.t.length, 'bars')
 
       const bars: BarData[] = []
       for (let i = 0; i < data.t.length; i++) {
@@ -336,18 +352,21 @@ class StockDataFetcher {
 
       return bars
     } catch (error) {
-      console.error('Sina intraday fetch error:', error)
+      console.error('[stockDataFetcher] ❌ Sina intraday fetch error:', error)
       return []
     }
   }
 
   subscribeIntraday(symbol: string, callback: IntradayCallback) {
+    console.log('[stockDataFetcher] Subscribing to intraday updates for:', symbol)
+    
     if (!this.intradayCallbacks.has(symbol)) {
       this.intradayCallbacks.set(symbol, [])
     }
     this.intradayCallbacks.get(symbol)!.push(callback)
 
     if (!this.intradayIntervals.has(symbol)) {
+      console.log('[stockDataFetcher] Starting intraday polling for:', symbol)
       this.startIntradayPolling(symbol)
     }
   }
@@ -355,13 +374,17 @@ class StockDataFetcher {
   private startIntradayPolling(symbol: string) {
     const poll = async () => {
       try {
+        console.log('[stockDataFetcher] Running intraday poll for:', symbol)
         const data = await this.getIntradayData(symbol)
         if (data.bars.length > 0) {
           const lastBar = data.bars[data.bars.length - 1]
+          console.log('[stockDataFetcher] Broadcasting intraday update for:', symbol, 'bar time:', lastBar.time)
           this.notifyIntradayCallbacks(symbol, lastBar)
+        } else {
+          console.warn('[stockDataFetcher] ⚠️ No bars available in intraday poll for:', symbol)
         }
       } catch (error) {
-        console.error(`Intraday polling error for ${symbol}:`, error)
+        console.error('[stockDataFetcher] ❌ Intraday polling error for', symbol, ':', error)
       }
     }
 
@@ -369,9 +392,12 @@ class StockDataFetcher {
 
     const interval = setInterval(poll, 60000)
     this.intradayIntervals.set(symbol, interval)
+    console.log('[stockDataFetcher] Intraday polling started for:', symbol, '- interval: 60000ms')
   }
 
   unsubscribeIntraday(symbol: string) {
+    console.log('[stockDataFetcher] Unsubscribing from intraday updates for:', symbol)
+    
     const interval = this.intradayIntervals.get(symbol)
     if (interval) {
       clearInterval(interval)
@@ -385,6 +411,7 @@ class StockDataFetcher {
   private notifyIntradayCallbacks(symbol: string, data: BarData) {
     const callbacks = this.intradayCallbacks.get(symbol)
     if (callbacks) {
+      console.log('[stockDataFetcher] Notifying', callbacks.length, 'intraday callbacks for:', symbol)
       callbacks.forEach(callback => callback(data))
     }
   }

@@ -5,9 +5,17 @@ import { Chart } from './Chart'
 export const MainContent: React.FC = () => {
   const { selectedStock, getIntradayData } = useStockStore()
   
+  console.log('[MainContent] Selected stock:', selectedStock?.code)
+  
   useIntradayData(selectedStock?.code || null)
   
   const chartData = selectedStock ? getIntradayData(selectedStock.code) : undefined
+  
+  console.log('[MainContent] Chart data:', chartData?.length, 'bars')
+  if (chartData && chartData.length > 0) {
+    console.log('[MainContent] First bar:', JSON.stringify(chartData[0]))
+    console.log('[MainContent] Last bar:', JSON.stringify(chartData[chartData.length - 1]))
+  }
 
   const formatPrice = (price?: number) => {
     if (price === undefined) return '--'
@@ -103,13 +111,20 @@ export const MainContent: React.FC = () => {
             
             <div className="bg-dark-primary rounded-lg p-6 border border-dark-border">
               <h3 className="text-lg font-semibold text-dark-text mb-4">当日分时图</h3>
-              {chartData && chartData.length > 0 ? (
-                <Chart symbol={selectedStock.code} data={chartData} />
-              ) : (
-                <div className="h-96 bg-dark-accent rounded flex items-center justify-center">
-                  <p className="text-dark-textSecondary">加载分时图表数据中...</p>
-                </div>
-              )}
+              {(() => {
+                console.log('[MainContent] Rendering chart section - chartData:', chartData?.length)
+                if (chartData && chartData.length > 0) {
+                  console.log('[MainContent] Rendering Chart component with', chartData.length, 'bars')
+                  return <Chart symbol={selectedStock.code} data={chartData} />
+                } else {
+                  console.log('[MainContent] No chart data, showing loading message')
+                  return (
+                    <div className="h-96 bg-dark-accent rounded flex items-center justify-center">
+                      <p className="text-dark-textSecondary">加载分时图表数据中...</p>
+                    </div>
+                  )
+                }
+              })()}
             </div>
             
             <div className="bg-dark-primary rounded-lg p-6 border border-dark-border">
