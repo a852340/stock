@@ -53,20 +53,20 @@ const store = new Store<StorageData>({
 
 function connectCryptoWebSocket(): Promise<void> {
   if (cryptoWs?.readyState === WebSocket.OPEN || cryptoConnecting) {
-    console.log('[Crypto] Already connected or connecting')
+    console.log('[OKX] Already connected or connecting')
     return Promise.resolve()
   }
 
   cryptoConnecting = true
   const wsUrl = 'wss://wspap.okx.com:8443/ws/v5/public'
-  console.log('[Crypto] WebSocket connecting to OKX:', wsUrl)
+  console.log('[OKX] 🔌 Connecting to:', wsUrl)
 
   return new Promise((resolve, reject) => {
     try {
       cryptoWs = new WebSocket(wsUrl)
 
       cryptoWs.on('open', () => {
-        console.log('✅ [Crypto] WebSocket connected to OKX')
+        console.log('[OKX] ✅ WebSocket opened - connection established')
         cryptoConnecting = false
         startCryptoHeartbeat()
         resubscribeAllCrypto()
@@ -74,21 +74,29 @@ function connectCryptoWebSocket(): Promise<void> {
       })
 
       cryptoWs.on('message', (data: WebSocket.Data) => {
+        console.log('[OKX] 📨 Message received, length:', data.toString().length)
         handleCryptoMessage(data.toString())
       })
 
-      cryptoWs.on('error', (error) => {
-        console.error('❌ [Crypto] WebSocket error:', error)
+      cryptoWs.on('error', (error: unknown) => {
+        console.error('[OKX] ❌ WebSocket error:', error)
+        const errorDetails = {
+          message: error instanceof Error ? error.message : String(error),
+          code: error instanceof Error && 'code' in error ? (error as Record<string, unknown>).code : 'unknown'
+        }
+        console.error('[OKX] Error details:', errorDetails)
         cryptoConnecting = false
         reject(error)
       })
 
-      cryptoWs.on('close', () => {
-        console.log('❌ [Crypto] WebSocket closed - not reconnecting (OKX mode)')
+      cryptoWs.on('close', (code, reason) => {
+        console.log('[OKX] ❌ WebSocket closed')
+        console.log('[OKX] Close details:', { code, reason: reason.toString() })
         cryptoConnecting = false
         stopCryptoHeartbeat()
       })
     } catch (error) {
+      console.error('[OKX] ❌ Exception during WebSocket creation:', error)
       cryptoConnecting = false
       reject(error)
     }
@@ -140,35 +148,52 @@ function subscribeToCryptoSymbol(okxSymbol: string) {
       op: 'subscribe',
       args: [
         {
-          channel: 'ticker',
+          channel: 'tickers',
           instId: okxSymbol
         }
       ]
     }
+    console.log('[OKX] 📤 Sending subscribe message:')
+    console.log('[OKX]', JSON.stringify(subscribeMsg, null, 2))
     cryptoWs.send(JSON.stringify(subscribeMsg))
-    console.log(`✅ [Crypto] Subscribed to OKX ticker for ${okxSymbol}`)
+    console.log(`[OKX] ✅ Subscribe sent for ${okxSymbol}`)
   } else {
-    console.warn(`⚠️ [Crypto] Cannot subscribe to ${okxSymbol}: WebSocket not connected`)
+    const readyState = cryptoWs?.readyState
+    console.warn(`[OKX] ⚠️ Cannot subscribe to ${okxSymbol}`)
+    console.warn(`[OKX] WebSocket state: ${readyState}`)
   }
 }
 
 function handleCryptoMessage(data: string) {
   try {
     const message = JSON.parse(data) as Record<string, unknown>
+    console.log('[OKX] 📨 Parsed message structure:')
+    console.log('[OKX]', JSON.stringify(message, null, 2))
     
     const arg = message.arg as Record<string, unknown> | undefined
     const messageData = message.data as unknown[] | undefined
-    if (arg?.channel === 'ticker' && messageData && Array.isArray(messageData)) {
+    
+    console.log('[OKX] Message analysis:', {
+      hasArg: !!arg,
+      argChannel: arg?.channel,
+      hasData: !!messageData,
+      isDataArray: Array.isArray(messageData),
+      isTickers: arg?.channel === 'tickers'
+    })
+    
+    if (arg?.channel === 'tickers' && messageData && Array.isArray(messageData)) {
       const tickerData = messageData[0] as Record<string, unknown>
       const instId = String(tickerData.instId)
       
-      console.log(`📨 [Crypto] Received OKX ticker data for ${instId}`)
-      console.log('[Crypto] Raw data:', {
-        instId: instId,
-        price: tickerData.last,
+      console.log(`[OKX] ✅ Ticker data received for ${instId}`)
+      console.log('[OKX] Ticker fields:', {
+        instId,
+        last: tickerData.last,
         open24h: tickerData.open24h,
         high24h: tickerData.high24h,
-        low24h: tickerData.low24h
+        low24h: tickerData.low24h,
+        volCcy24h: tickerData.volCcy24h,
+        ts: tickerData.ts
       })
       
       const symbolName = instId.split('-')[0]
@@ -190,13 +215,20 @@ function handleCryptoMessage(data: string) {
         lastUpdate: parseInt(String(tickerData.ts))
       }
       
+      console.log('[OKX] 📦 Sending to renderer:', quoteData)
+      
       if (win) {
         win.webContents.send('crypto-ticker-update', quoteData)
-        console.log('[Crypto] Sent to renderer:', quoteData.symbol)
+        console.log('[OKX] ✅ Data sent to renderer for symbol:', symbolName)
+      } else {
+        console.warn('[OKX] ⚠️ Window not available, cannot send data')
       }
+    } else {
+      console.log('[OKX] ℹ️ Non-ticker message, ignoring')
     }
   } catch (error) {
-    console.error('❌ [Crypto] Failed to parse WebSocket message:', error)
+    console.error('[OKX] ❌ Failed to parse WebSocket message:', error)
+    console.error('[OKX] Raw data sample:', data.substring(0, 200))
   }
 }
 
@@ -221,22 +253,33 @@ function setupIpcHandlers() {
 
   // Crypto WebSocket handlers
   ipcMain.handle('crypto-subscribe', async (_event, symbol: string) => {
-    console.log(`[Crypto IPC] Subscribe request for ${symbol}`)
+    console.log(`[OKX] 📥 IPC Subscribe request for ${symbol}`)
     if (!cryptoSubscriptions.has('main')) {
       cryptoSubscriptions.set('main', new Set())
     }
     cryptoSubscriptions.get('main')!.add(symbol)
     
-    await connectCryptoWebSocket()
+    console.log(`[OKX] Connecting WebSocket...`)
+    try {
+      await connectCryptoWebSocket()
+      console.log(`[OKX] ✅ WebSocket connected`)
+    } catch (error) {
+      console.error(`[OKX] ❌ Failed to connect WebSocket:`, error)
+      throw error
+    }
+    
     const okxSymbol = getOkxSymbol(symbol)
     if (okxSymbol) {
+      console.log(`[OKX] Mapping ${symbol} -> ${okxSymbol}`)
       subscribeToCryptoSymbol(okxSymbol)
+    } else {
+      console.warn(`[OKX] ⚠️ No OKX symbol mapping for ${symbol}`)
     }
     return true
   })
 
   ipcMain.handle('crypto-unsubscribe', (_event, symbol: string) => {
-    console.log(`[Crypto IPC] Unsubscribe request for ${symbol}`)
+    console.log(`[OKX] 📥 IPC Unsubscribe request for ${symbol}`)
     if (cryptoSubscriptions.has('main')) {
       cryptoSubscriptions.get('main')!.delete(symbol)
     }
@@ -248,13 +291,14 @@ function setupIpcHandlers() {
           op: 'unsubscribe',
           args: [
             {
-              channel: 'ticker',
+              channel: 'tickers',
               instId: okxSymbol
             }
           ]
         }
+        console.log('[OKX] 📤 Sending unsubscribe message:', JSON.stringify(unsubscribeMsg))
         cryptoWs.send(JSON.stringify(unsubscribeMsg))
-        console.log(`✅ [Crypto] Unsubscribed from OKX ticker for ${okxSymbol}`)
+        console.log(`[OKX] ✅ Unsubscribe sent for ${okxSymbol}`)
       }
     }
     return true
