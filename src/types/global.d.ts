@@ -1,13 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
   interface Window {
-    cryptoWS: {
-      subscribe: (symbol: string) => Promise<boolean>
-      unsubscribe: (symbol: string) => Promise<boolean>
-      disconnect: () => Promise<boolean>
-      isConnected: () => Promise<boolean>
-      on: (channel: string, listener: (...args: any[]) => void) => void
-      off: (channel: string, listener: any) => void
-    }
     ipcRenderer: {
       send: (channel: string, ...args: any[]) => void
       on: (channel: string, listener: (event: any, ...args: any[]) => void) => void

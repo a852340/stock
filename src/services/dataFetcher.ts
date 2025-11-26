@@ -1,6 +1,5 @@
 import { QuoteData } from '../types/quote'
 import { getSymbolConfig } from '../config/dataSourceConfig'
-import { cryptoDataFetcher } from './cryptoDataFetcher'
 import { stockDataFetcher } from './stockDataFetcher'
 
 type DataCallback = (data: QuoteData) => void
@@ -13,20 +12,7 @@ class DataFetcher {
       throw new Error(`Unsupported symbol: ${symbol}`)
     }
 
-    if (config.type === 'crypto') {
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Timeout waiting for crypto data'))
-        }, 10000)
-
-        cryptoDataFetcher.subscribe(symbol, (data) => {
-          clearTimeout(timeout)
-          resolve(data)
-        }).catch(reject)
-      })
-    } else {
-      return stockDataFetcher.fetchStockData(symbol)
-    }
+    return stockDataFetcher.fetchStockData(symbol)
   }
 
   async subscribe(symbol: string, callback: DataCallback): Promise<void> {
@@ -36,11 +22,7 @@ class DataFetcher {
       throw new Error(`Unsupported symbol: ${symbol}`)
     }
 
-    if (config.type === 'crypto') {
-      await cryptoDataFetcher.subscribe(symbol, callback)
-    } else {
-      stockDataFetcher.subscribe(symbol, callback)
-    }
+    stockDataFetcher.subscribe(symbol, callback)
   }
 
   unsubscribe(symbol: string) {
@@ -50,11 +32,7 @@ class DataFetcher {
       return
     }
 
-    if (config.type === 'crypto') {
-      cryptoDataFetcher.unsubscribe(symbol)
-    } else {
-      stockDataFetcher.unsubscribe(symbol)
-    }
+    stockDataFetcher.unsubscribe(symbol)
   }
 
   updateStockPollingInterval(interval: number) {
@@ -66,19 +44,15 @@ class DataFetcher {
   }
 
   disconnect() {
-    cryptoDataFetcher.disconnect()
     stockDataFetcher.stopAll()
   }
 
   isConnected(): boolean {
-    // Note: This is now async in cryptoDataFetcher, but keeping sync for backwards compatibility
-    // The actual connection check happens via IPC in the background
     return true
   }
 
-  getActiveSubscriptions(): { crypto: string[], stock: string[] } {
+  getActiveSubscriptions(): { stock: string[] } {
     return {
-      crypto: cryptoDataFetcher.getSubscribedSymbols(),
       stock: stockDataFetcher.getPollingSymbols()
     }
   }

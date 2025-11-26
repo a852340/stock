@@ -8,19 +8,18 @@ export function useDataFeed() {
   const stockCodes = useMemo(() => stocks.map(s => s.code).join(','), [stocks])
 
   useEffect(() => {
-    console.log('[useDataFeed] Setting up subscriptions for stocks:', stocks.map(s => s.code))
+    console.log('[useDataFeed] Setting up subscriptions for A-shares:', stocks.map(s => s.code))
     
     let isMounted = true
 
     stocks.forEach(stock => {
-      console.log('[useDataFeed] Subscribing to:', stock.code, 'Type:', stock.type)
+      console.log('[useDataFeed] Subscribing to A-share:', stock.code)
       
       dataFetcher.subscribe(stock.code, (data) => {
         if (isMounted) {
           console.log('[useDataFeed] Received data for', stock.code, ':', {
             price: data.price,
-            change24h: data.change24h,
-            type: data.type
+            change24h: data.change24h
           })
           updateQuoteData(stock.code, data)
         }
