@@ -249,11 +249,31 @@ class StockDataFetcher {
   }
 
   private async fetchIntradayBars(symbol: string): Promise<BarData[]> {
-    if (this.config.dataSource === 'tencent') {
-      return this.fetchIntradayFromTencent(symbol)
-    } else {
-      return this.fetchIntradayFromSina(symbol)
+    const sources = [
+      { name: '腾讯', fn: () => this.fetchIntradayFromTencent(symbol) },
+      { name: '新浪', fn: () => this.fetchIntradayFromSina(symbol) }
+    ]
+
+    // If configured source is Sina, try Sina first
+    if (this.config.dataSource === 'sina') {
+      sources.reverse()
     }
+
+    for (const source of sources) {
+      try {
+        console.log(`[stockDataFetcher] 尝试从${source.name}获取分时数据: ${symbol}`)
+        const bars = await source.fn()
+        if (bars.length > 0) {
+          console.log(`[stockDataFetcher] ✅ 从${source.name}成功获取 ${bars.length} 根K线: ${symbol}`)
+          return bars
+        }
+      } catch (error) {
+        console.error(`[stockDataFetcher] ❌ 从${source.name}获取数据失败 (${symbol}):`, error)
+      }
+    }
+
+    console.warn(`[stockDataFetcher] ⚠️ 所有数据源都无法获取分时数据: ${symbol}`)
+    return []
   }
 
   private async fetchIntradayFromTencent(symbol: string): Promise<BarData[]> {
@@ -262,7 +282,7 @@ class StockDataFetcher {
     
     const url = `https://ifzq.gtimg.cn/appstock/app/fqkline/get?param=${fullSymbol},day,1,`
     
-    console.log('[stockDataFetcher] Calling Tencent API for:', fullSymbol, 'URL:', url)
+    console.log('[stockDataFetcher] 调用腾讯API:', fullSymbol, 'URL:', url)
     
     try {
       const response = await axios.get(url, {
@@ -270,26 +290,38 @@ class StockDataFetcher {
         responseType: 'json'
       })
 
-      console.log('[stockDataFetcher] ✅ Tencent API response received, code:', response.data?.code)
-
       const data = response.data
+      console.log('[stockDataFetcher] ✅ 腾讯API响应状态码:', data?.code)
+      console.log('[stockDataFetcher] 腾讯API响应键:', Object.keys(data || {}))
+
       if (!data || data.code !== 0) {
-        console.error('[stockDataFetcher] ❌ Invalid response code from Tencent API:', data?.code)
-        throw new Error('Invalid response from Tencent intraday API')
+        console.error('[stockDataFetcher] ❌ 腾讯API返回错误码:', data?.code)
+        throw new Error(`Invalid response code from Tencent: ${data?.code}`)
       }
 
-      if (!data.data || !data.data[fullSymbol]) {
-        console.error('[stockDataFetcher] ❌ No data for symbol in Tencent response:', fullSymbol)
-        throw new Error('No intraday data in Tencent response')
+      if (!data.data) {
+        console.error('[stockDataFetcher] ❌ 腾讯API响应中没有data字段')
+        console.error('[stockDataFetcher] 完整响应:', JSON.stringify(data, null, 2))
+        throw new Error('No data field in Tencent response')
+      }
+
+      console.log('[stockDataFetcher] 腾讯API data中的键:', Object.keys(data.data))
+
+      if (!data.data[fullSymbol]) {
+        console.error('[stockDataFetcher] ❌ 腾讯API中没有该标的数据:', fullSymbol)
+        console.error('[stockDataFetcher] 可用的标的:', Object.keys(data.data))
+        throw new Error(`No data for symbol ${fullSymbol} in Tencent response`)
       }
 
       const stockData = data.data[fullSymbol]
+      console.log('[stockDataFetcher] 标的数据键:', Object.keys(stockData))
+
       if (!stockData.day || stockData.day.length === 0) {
-        console.warn('[stockDataFetcher] ⚠️ Tencent API returned no bars for:', fullSymbol)
+        console.warn('[stockDataFetcher] ⚠️ 腾讯API为该标的返回了0条K线:', fullSymbol)
         return []
       }
 
-      console.log('[stockDataFetcher] ✅ Tencent API returned', stockData.day.length, 'bars')
+      console.log('[stockDataFetcher] ✅ 腾讯API返回', stockData.day.length, '根K线')
 
       return stockData.day.map((bar: string[]) => {
         const time = bar[0]
@@ -309,8 +341,8 @@ class StockDataFetcher {
         }
       })
     } catch (error) {
-      console.error('[stockDataFetcher] ❌ Tencent intraday fetch error:', error)
-      return []
+      console.error('[stockDataFetcher] ❌ 腾讯分时数据获取失败:', error)
+      throw error
     }
   }
 
@@ -320,7 +352,7 @@ class StockDataFetcher {
     
     const url = `https://vip.stock.finance.sina.com.cn/q_gn/api/extral.php?symbol=${fullSymbol}&bdate=&edate=&param=&type=1&resolution=1&_s=pc`
     
-    console.log('[stockDataFetcher] Calling Sina API for:', fullSymbol, 'URL:', url)
+    console.log('[stockDataFetcher] 调用新浪API:', fullSymbol, 'URL:', url)
     
     try {
       const response = await axios.get(url, {
@@ -328,15 +360,18 @@ class StockDataFetcher {
         responseType: 'json'
       })
 
-      console.log('[stockDataFetcher] ✅ Sina API response received')
+      console.log('[stockDataFetcher] ✅ 新浪API响应已接收')
 
       const data = response.data
+      console.log('[stockDataFetcher] 新浪API响应键:', Object.keys(data || {}))
+
       if (!data || !data.t || !data.o) {
-        console.warn('[stockDataFetcher] ⚠️ Sina API returned invalid data structure')
-        return []
+        console.error('[stockDataFetcher] ❌ 新浪API返回无效的数据结构')
+        console.error('[stockDataFetcher] 响应数据:', JSON.stringify(data, null, 2).substring(0, 500))
+        throw new Error('Invalid data structure from Sina API')
       }
 
-      console.log('[stockDataFetcher] ✅ Sina API returned', data.t.length, 'bars')
+      console.log('[stockDataFetcher] ✅ 新浪API返回', data.t.length, '根K线')
 
       const bars: BarData[] = []
       for (let i = 0; i < data.t.length; i++) {
@@ -352,8 +387,8 @@ class StockDataFetcher {
 
       return bars
     } catch (error) {
-      console.error('[stockDataFetcher] ❌ Sina intraday fetch error:', error)
-      return []
+      console.error('[stockDataFetcher] ❌ 新浪分时数据获取失败:', error)
+      throw error
     }
   }
 
