@@ -292,12 +292,6 @@ function createWindow() {
     },
   })
 
-  // Open dev tools in development
-  if (VITE_DEV_SERVER_URL) {
-    console.log('[Main] Opening dev tools for development')
-    win.webContents.openDevTools()
-  }
-
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     console.log('[Main] Window loaded, sending test message')
