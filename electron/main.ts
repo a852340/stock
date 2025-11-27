@@ -152,6 +152,53 @@ function parseIntradayDataTencent(data: string): Array<{
   return bars
 }
 
+function parseIntradayDataEastMoney(data: string): Array<{
+  time: number | string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume?: number
+}> {
+  const bars: Array<{
+    time: number | string
+    open: number
+    high: number
+    low: number
+    close: number
+    volume?: number
+  }> = []
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsedData = JSON.parse(data) as any
+    
+    if (!parsedData || !parsedData.fenShiData) {
+      console.error('[Main] Invalid data structure from EastMoney API')
+      return []
+    }
+
+    const fenShiData = parsedData.fenShiData as Array<[string, number, number, string]>
+    
+    for (const bar of fenShiData) {
+      if (bar && bar.length >= 3) {
+        bars.push({
+          time: bar[0],
+          open: bar[1],
+          high: bar[1],
+          low: bar[1],
+          close: bar[1],
+          volume: bar[2]
+        })
+      }
+    }
+  } catch (error) {
+    console.error('[Main] Parse error for EastMoney data:', error)
+  }
+
+  return bars
+}
+
 function fetchFromUrl(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     https.get(url, (res: IncomingMessage) => {
@@ -198,40 +245,63 @@ function setupIpcHandlers() {
       
       // Try Tencent first
       try {
-        const tencentUrl = `https://ifzq.gtimg.cn/appstock/app/fqkline/get?param=${fullSymbol},day,1,`
-        console.log('[Main] Trying Tencent API:', tencentUrl)
+        const tencentUrl = `https://ifzq.gtimg.cn/appstock/app/fqkline/get?param=${fullSymbol},day,1,&_t=${Date.now()}`
+        console.log('[Main] 尝试腾讯 API:', tencentUrl)
         
         const response = await fetchFromUrl(tencentUrl)
         const bars = parseIntradayDataTencent(response)
         
         if (bars.length > 0) {
-          console.log('[Main] ✅ Got', bars.length, 'bars from Tencent')
+          console.log('[Main] ✅ 腾讯 API 成功，获取', bars.length, '根K线')
           return bars
+        } else {
+          console.warn('[Main] ⚠️ 腾讯 API 返回空数据')
         }
       } catch (error) {
-        console.error('[Main] ❌ Tencent API failed:', error)
+        console.error('[Main] ❌ 腾讯 API 失败:', error)
       }
       
       // Try Sina as fallback
       try {
         const sinaUrl = `https://vip.stock.finance.sina.com.cn/q_gn/api/extral.php?symbol=${fullSymbol}&bdate=&edate=&param=&type=1&resolution=1&_s=pc`
-        console.log('[Main] Trying Sina API:', sinaUrl)
+        console.log('[Main] 尝试新浪 API:', sinaUrl)
         
         const response = await fetchFromUrl(sinaUrl)
         const bars = parseIntradayDataSina(response)
         
         if (bars.length > 0) {
-          console.log('[Main] ✅ Got', bars.length, 'bars from Sina')
+          console.log('[Main] ✅ 新浪 API 成功，获取', bars.length, '根K线')
           return bars
+        } else {
+          console.warn('[Main] ⚠️ 新浪 API 返回空数据')
         }
       } catch (error) {
-        console.error('[Main] ❌ Sina API failed:', error)
+        console.error('[Main] ❌ 新浪 API 失败:', error)
       }
       
-      console.warn('[Main] ⚠️ No data from any source for:', symbol)
+      // Try EastMoney as second fallback
+      try {
+        const eastmoneyCode = market === 'sh' ? `1${symbol}` : `0${symbol}`
+        const eastmoneyUrl = `https://push2ex.eastmoney.com/getStockFenshi?code=${eastmoneyCode}&_t=${Date.now()}`
+        console.log('[Main] 尝试东方财富 API:', eastmoneyUrl)
+        
+        const response = await fetchFromUrl(eastmoneyUrl)
+        const bars = parseIntradayDataEastMoney(response)
+        
+        if (bars.length > 0) {
+          console.log('[Main] ✅ 东方财富 API 成功，获取', bars.length, '根K线')
+          return bars
+        } else {
+          console.warn('[Main] ⚠️ 东方财富 API 返回空数据')
+        }
+      } catch (error) {
+        console.error('[Main] ❌ 东方财富 API 失败:', error)
+      }
+      
+      console.warn('[Main] ⚠️ 无法从任何数据源获取分时数据:', symbol)
       return []
     } catch (error) {
-      console.error('[Main] Error in stock-get-intraday:', error)
+      console.error('[Main] stock-get-intraday 错误:', error)
       return []
     }
   })
