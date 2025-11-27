@@ -15,6 +15,7 @@ declare global {
     }
     stockApi: {
       getIntradayData: (symbol: string) => Promise<any[]>
+      getSpotData: (symbol: string) => Promise<any>
     }
   }
 }
