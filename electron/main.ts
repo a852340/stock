@@ -173,35 +173,133 @@ function parseIntradayDataEastMoney(data: string): Array<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsedData = JSON.parse(data) as any
     
-    if (!parsedData || !parsedData.fenShiData) {
-      console.error('[Main] Invalid data structure from EastMoney API')
+    if (!parsedData || !parsedData.data) {
+      console.error('[Main] Invalid data structure from EastMoney trends2 API')
       return []
     }
 
-    const fenShiData = parsedData.fenShiData as Array<[string, number, number, string]>
+    const responseData = parsedData.data
     
-    for (const bar of fenShiData) {
-      if (bar && bar.length >= 3) {
+    // Handle trends2 API format: trends array with "time price volume totalAmount" format
+    const trends = responseData.trends as string[]
+    
+    if (!trends || trends.length === 0) {
+      console.warn('[Main] ⚠️ No trends data from EastMoney trends2 API')
+      return []
+    }
+    
+    for (const trendStr of trends) {
+      try {
+        // Format: "2025-11-25 09:30:00 3500.00 3505.00 3490.00 100000"
+        // Or simpler format: "09:30 3500.00 100000"
+        const parts = trendStr.trim().split(/\s+/)
+        
+        if (parts.length < 2) continue
+        
+        let timeStr = ''
+        let priceIdx = 1
+        let volumeIdx = 2
+        
+        // Check if first part contains a date
+        if (parts[0].includes('-') && parts.length >= 3) {
+          // Full format with date
+          timeStr = `${parts[0]} ${parts[1]}`
+          priceIdx = 2
+          volumeIdx = 5
+        } else {
+          // Time only format
+          timeStr = parts[0]
+          priceIdx = 1
+          volumeIdx = 2
+        }
+        
+        const price = parseFloat(parts[priceIdx])
+        const volume = parseInt(parts[volumeIdx]) || 0
+        
+        if (isNaN(price)) continue
+        
         bars.push({
-          time: bar[0],
-          open: bar[1],
-          high: bar[1],
-          low: bar[1],
-          close: bar[1],
-          volume: bar[2]
+          time: timeStr,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          volume: volume
         })
+      } catch (e) {
+        continue
       }
     }
   } catch (error) {
-    console.error('[Main] Parse error for EastMoney data:', error)
+    console.error('[Main] Parse error for EastMoney trends2 data:', error)
   }
 
   return bars
 }
 
-function fetchFromUrl(url: string): Promise<string> {
+function parseSpotDataEastMoney(data: string): {
+  name: string
+  price: number
+  change: number
+  changePercent: number
+  volume: number
+} | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsedData = JSON.parse(data) as any
+    
+    if (!parsedData || parsedData.code !== 0 || !parsedData.data) {
+      console.error('[Main] Invalid response from EastMoney spot API')
+      return null
+    }
+
+    const spotData = parsedData.data
+    
+    return {
+      name: spotData.f58 || 'N/A',
+      price: spotData.f2 || 0,
+      change: spotData.f3 || 0,
+      changePercent: spotData.f4 || 0,
+      volume: spotData.f47 || 0
+    }
+  } catch (error) {
+    console.error('[Main] Parse error for EastMoney spot data:', error)
+    return null
+  }
+}
+
+function fetchFromUrl(url: string, redirects = 0): Promise<string> {
   return new Promise((resolve, reject) => {
     https.get(url, (res: IncomingMessage) => {
+      const maxRedirects = 5
+      
+      // Handle 302/301 redirects
+      if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) && res.headers.location) {
+        if (redirects < maxRedirects) {
+          const redirectUrl = res.headers.location as string
+          const finalUrl = redirectUrl.startsWith('http') ? redirectUrl : `https:${redirectUrl}`
+          
+          console.log(`[Main] Redirect (${res.statusCode}) to: ${finalUrl}`)
+          
+          // Consume response data to free up socket
+          res.resume()
+          
+          fetchFromUrl(finalUrl, redirects + 1)
+            .then(resolve)
+            .catch(reject)
+        } else {
+          reject(new Error('Too many redirects'))
+        }
+        return
+      }
+      
+      if (res.statusCode !== 200) {
+        console.warn(`[Main] HTTP ${res.statusCode} from ${url}`)
+        res.resume()
+        resolve('')
+        return
+      }
+      
       let data = ''
       
       res.on('data', (chunk: Buffer) => {
@@ -236,15 +334,93 @@ function setupIpcHandlers() {
     return true
   })
 
+  ipcMain.handle('stock-get-spot', async (_event, symbol: string) => {
+    try {
+      console.log('[Main] 获取实时行情数据 (从 akshare stock_zh_a_spot_em):', symbol)
+      
+      const secid = symbol.startsWith('6') ? `1.${symbol}` : `0.${symbol}`
+      
+      const params = new URLSearchParams({
+        ut: 'v65c4e5a28de59',
+        fields: 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18',
+        secid: secid,
+        fltt: '2',
+        invt: '2',
+        fid: 'f3',
+        fs: 'b',
+        pz: '500',
+        po: '1',
+        _t: String(Date.now())
+      })
+      
+      const url = `https://19.push2.eastmoney.com/api/qt/stock/get?${params.toString()}`
+      console.log('[Main] 东方财富实时行情 API 调用:', url)
+      
+      const response = await fetchFromUrl(url)
+      const spotData = parseSpotDataEastMoney(response)
+      
+      if (spotData) {
+        console.log('[Main] ✅ 东方财富实时行情 API 成功，获取:', spotData)
+        return {
+          symbol,
+          name: spotData.name,
+          price: spotData.price,
+          change24h: spotData.changePercent,
+          changeAmount: spotData.change,
+          volume: spotData.volume,
+          type: 'stock',
+          dataSource: 'eastmoney',
+          isRealtime: true,
+          lastUpdate: Date.now()
+        }
+      } else {
+        console.warn('[Main] ⚠️ 无法解析东方财富实时行情数据')
+        return null
+      }
+    } catch (error) {
+      console.error('[Main] ❌ 获取实时行情失败:', error)
+      return null
+    }
+  })
+
   ipcMain.handle('stock-get-intraday', async (_event, symbol: string) => {
     try {
-      console.log('[Main] Fetching intraday data for:', symbol)
+      console.log('[Main] 获取分时数据 (从 akshare stock_zh_a_hist_min_em):', symbol)
       
-      const market = symbol === '000001' || symbol.startsWith('6') ? 'sh' : 'sz'
-      const fullSymbol = `${market}${symbol}`
+      const secid = symbol.startsWith('6') ? `1.${symbol}` : `0.${symbol}`
       
-      // Try Tencent first
+      // Try primary EastMoney trends2 API (akshare stock_zh_a_hist_min_em approach)
       try {
+        const params = new URLSearchParams({
+          ut: 'v65c4e5a28de59',
+          fields1: 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14',
+          fields2: 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
+          mpi: '600',
+          invt: '2',
+          secid: secid,
+          _t: String(Date.now())
+        })
+        
+        const eastmoneyUrl = `https://push2his.eastmoney.com/api/qt/stock/trends2?${params.toString()}`
+        console.log('[Main] 尝试东方财富 trends2 API (akshare 方式):', eastmoneyUrl)
+        
+        const response = await fetchFromUrl(eastmoneyUrl)
+        const bars = parseIntradayDataEastMoney(response)
+        
+        if (bars.length > 0) {
+          console.log('[Main] ✅ 东方财富 trends2 API 成功，获取', bars.length, '根K线')
+          return bars
+        } else {
+          console.warn('[Main] ⚠️ 东方财富 trends2 API 返回空数据')
+        }
+      } catch (error) {
+        console.error('[Main] ❌ 东方财富 trends2 API 失败:', error)
+      }
+      
+      // Fallback: Try Tencent
+      try {
+        const market = symbol === '000001' || symbol.startsWith('6') ? 'sh' : 'sz'
+        const fullSymbol = `${market}${symbol}`
         const tencentUrl = `https://ifzq.gtimg.cn/appstock/app/fqkline/get?param=${fullSymbol},day,1,&_t=${Date.now()}`
         console.log('[Main] 尝试腾讯 API:', tencentUrl)
         
@@ -261,8 +437,10 @@ function setupIpcHandlers() {
         console.error('[Main] ❌ 腾讯 API 失败:', error)
       }
       
-      // Try Sina as fallback
+      // Fallback: Try Sina
       try {
+        const market = symbol === '000001' || symbol.startsWith('6') ? 'sh' : 'sz'
+        const fullSymbol = `${market}${symbol}`
         const sinaUrl = `https://vip.stock.finance.sina.com.cn/q_gn/api/extral.php?symbol=${fullSymbol}&bdate=&edate=&param=&type=1&resolution=1&_s=pc`
         console.log('[Main] 尝试新浪 API:', sinaUrl)
         
@@ -277,25 +455,6 @@ function setupIpcHandlers() {
         }
       } catch (error) {
         console.error('[Main] ❌ 新浪 API 失败:', error)
-      }
-      
-      // Try EastMoney as second fallback
-      try {
-        const eastmoneyCode = market === 'sh' ? `1${symbol}` : `0${symbol}`
-        const eastmoneyUrl = `https://push2ex.eastmoney.com/getStockFenshi?code=${eastmoneyCode}&_t=${Date.now()}`
-        console.log('[Main] 尝试东方财富 API:', eastmoneyUrl)
-        
-        const response = await fetchFromUrl(eastmoneyUrl)
-        const bars = parseIntradayDataEastMoney(response)
-        
-        if (bars.length > 0) {
-          console.log('[Main] ✅ 东方财富 API 成功，获取', bars.length, '根K线')
-          return bars
-        } else {
-          console.warn('[Main] ⚠️ 东方财富 API 返回空数据')
-        }
-      } catch (error) {
-        console.error('[Main] ❌ 东方财富 API 失败:', error)
       }
       
       console.warn('[Main] ⚠️ 无法从任何数据源获取分时数据:', symbol)

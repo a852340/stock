@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronStore', {
 
 contextBridge.exposeInMainWorld('stockApi', {
   getIntradayData: (symbol: string) => ipcRenderer.invoke('stock-get-intraday', symbol),
+  getSpotData: (symbol: string) => ipcRenderer.invoke('stock-get-spot', symbol),
 })
 
 console.log('[Preload] Preload script completed, APIs exposed:', {

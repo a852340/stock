@@ -39,6 +39,19 @@ class StockDataFetcher {
     try {
       let data: QuoteData
 
+      // Try EastMoney first (akshare approach)
+      try {
+        data = await this.fetchFromEastMoney(symbol)
+        this.cache.set(symbol, {
+          data,
+          timestamp: now
+        })
+        return data
+      } catch (error) {
+        console.warn(`Failed to fetch from EastMoney: ${error}`)
+      }
+
+      // Fallback to configured source
       if (this.config.dataSource === 'tencent') {
         data = await this.fetchFromTencent(symbol)
       } else {
@@ -154,6 +167,23 @@ class StockDataFetcher {
       dataSource: 'sina',
       isRealtime: false,
       lastUpdate: Date.now()
+    }
+  }
+
+  private async fetchFromEastMoney(symbol: string): Promise<QuoteData> {
+    console.log(`[stockDataFetcher] Fetching from EastMoney (akshare stock_zh_a_spot_em): ${symbol}`)
+    
+    try {
+      const spotData = await window.stockApi.getSpotData(symbol)
+      
+      if (spotData) {
+        return spotData as QuoteData
+      }
+      
+      throw new Error('No spot data returned from EastMoney')
+    } catch (error) {
+      console.error(`[stockDataFetcher] Failed to fetch from EastMoney: ${error}`)
+      throw error
     }
   }
 

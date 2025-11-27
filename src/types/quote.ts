@@ -7,7 +7,7 @@ export interface QuoteData {
   marketCap?: number
   volume?: number
   type: 'crypto' | 'stock'
-  dataSource: 'okx' | 'tencent' | 'sina'
+  dataSource: 'okx' | 'tencent' | 'sina' | 'eastmoney'
   isRealtime: boolean
   lastUpdate: number
 }
